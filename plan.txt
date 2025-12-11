@@ -1,0 +1,23 @@
+Project Structure:
+- pipeline
+    - train_model
+    - save best configuration
+    - optuna
+    - save runtime statistics
+- Model
+    - create from dictionary
+    - train
+    - forwards
+    - backwards
+- SiameseEncoders folder
+    - Encoder
+        - create from dictionary
+        - forwards
+        - backwards
+    - SiameseNeuralNetworks
+- ComparisonHeads folder
+    - ComparisonHead
+        - create from dictionary
+        - forwards
+        - backwards
+    - SiameseHead
