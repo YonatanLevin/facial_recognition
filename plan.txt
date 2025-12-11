@@ -1,23 +1,28 @@
 Project Structure:
+- main
+    - load models
+    - run pipeline
 - pipeline
-    - train_model
-    - save best configuration
-    - optuna
-    - save runtime statistics
+    - optimize model
+    - optimize models
+- data handeler
+    - load train/test (pandas? torch dataloader?)
+    - augmentations (dataloader?)
 - Model
-    - create from dictionary
+    - reset from dictionary
     - train
-    - forwards
-    - backwards
+    - forward
+    - backward
+    - save train statistics
 - SiameseEncoders folder
     - Encoder
-        - create from dictionary
-        - forwards
-        - backwards
+        - reset from dictionary
+        - forward
+        - backward
     - SiameseNeuralNetworks
 - ComparisonHeads folder
     - ComparisonHead
-        - create from dictionary
-        - forwards
-        - backwards
+        - reset from dictionary
+        - forward
+        - backward
     - SiameseHead

@@ -1,6 +1,11 @@
-def main():
-    print('starting pipeline')
-    print('pipeline ended')
+from model import Model
 
-if __name__ == '__main__':
-    main()
+class Pipeline():
+    def __init__(self):
+        pass
+
+    def optimize_model(model: Model):
+        pass
+
+    def optimize_models():
+        pass
