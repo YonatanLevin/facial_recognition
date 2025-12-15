@@ -1,3 +1,4 @@
 data
 .git_keys
 .venv
+__pycache__/

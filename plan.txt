@@ -6,8 +6,8 @@ Project Structure:
     - optimize model
     - optimize models
 - data handeler
-    - load train/test (pandas? torch dataloader?)
-    - augmentations (dataloader?)
+    - load train/test (dataset)
+    - augmentations (dataloaders)
 - Model
     - reset from dictionary
     - train
