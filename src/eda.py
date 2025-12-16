@@ -26,7 +26,13 @@ def plot_sample_pairs(dataset):
         img2 = img2[0,:,:].detach().cpu()
         axes[i,0].imshow(img1)
         axes[i,1].imshow(img2)
+
+        axes[i,0].axis('off')
+        axes[i,1].axis('off')
+
         labels.append(label)
+
+    fig.tight_layout()
     
     plt.show()
 

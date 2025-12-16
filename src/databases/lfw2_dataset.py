@@ -1,5 +1,5 @@
 from os.path import join
-from typing import Callable, Optional
+from typing import Optional
 
 import pandas as pd
 from torch.utils.data import Dataset
@@ -70,10 +70,10 @@ class LFW2Dataset(Dataset):
         label = name1 == name2
         
         img1_path = self.constract_img_path(name1, idx1)
-        img2_path = self.constract_img_path(name1, idx2)
+        img2_path = self.constract_img_path(name2, idx2)
 
-        img1 = decode_image(img1_path)
-        img2 = decode_image(img2_path)
+        img1 = decode_image(img1_path).float()
+        img2 = decode_image(img2_path).float()
 
         if self.img_transformer:
             img1 = self.img_transformer(img1)

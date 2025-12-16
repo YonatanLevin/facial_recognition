@@ -1,0 +1,5 @@
+{
+    "encoder_name": "PaperCNN",
+    "head_name": "PaperHead",
+    "encoding_dim": 4096
+}

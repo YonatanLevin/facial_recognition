@@ -1,6 +1,6 @@
 from torch import manual_seed
 
-from src.pipeline import Pipeline
+from pipeline import Pipeline
 
 def main():
     manual_seed(42)
