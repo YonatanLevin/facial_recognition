@@ -3,26 +3,23 @@ Project Structure:
     - load models
     - run pipeline
 - pipeline
-    - optimize model
-    - optimize models
+    - train model
+        - request parameters file
+        - save train statistics
 - data handeler
     - load train/test (dataset)
-    - augmentations (dataloaders)
+    - augmentations (ImgTransformer)
 - Model
-    - reset from dictionary
+    - init from dictionary
     - train
     - forward
-    - backward
-    - save train statistics
 - SiameseEncoders folder
     - Encoder
-        - reset from dictionary
+        - init from dictionary
         - forward
-        - backward
     - SiameseNeuralNetworks
 - ComparisonHeads folder
     - ComparisonHead
-        - reset from dictionary
+        - init from dictionary
         - forward
-        - backward
     - SiameseHead

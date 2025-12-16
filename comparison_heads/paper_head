@@ -1,4 +1,0 @@
-from comparison_head import ComparisonHead
-
-class PaperHead(ComparisonHead):
-    pass

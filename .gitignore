@@ -2,3 +2,4 @@ data
 .git_keys
 .venv
 __pycache__/
+eda_plots
