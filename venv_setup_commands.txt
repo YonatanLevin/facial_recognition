@@ -1,5 +1,5 @@
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 python -m venv .venv
-.\.venv\Scripts\activate.bat
 .\.venv\Scripts\Activate.ps1
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+pip install --upgrade pip
 pip install -r requirements.txt

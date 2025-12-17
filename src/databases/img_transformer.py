@@ -2,7 +2,7 @@ from abc import ABC
 
 from torch import Tensor
 
-class ImgTransformer():
+class ImgTransformer(ABC):
     def __init__(self):
         """
         Image transformer
