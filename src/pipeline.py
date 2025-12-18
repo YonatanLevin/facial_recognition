@@ -1,12 +1,17 @@
 import json
-from os.path import join
+from os.path import join, isfile
 from typing import Any
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader, random_split
 from torch.optim import Optimizer, SGD 
 from torch.optim.lr_scheduler import LRScheduler, StepLR
 from tqdm import tqdm
+import pandas as pd
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from matplotlib import pyplot as plt
+import seaborn as sns
 
 from databases.lfw2_dataset import LFW2Dataset
 from databases.img_transformer import ImgTransformer
@@ -26,13 +31,20 @@ class Pipeline():
         self.max_epochs = 30
         self.loss_fn = torch.nn.BCEWithLogitsLoss()
 
-        config_dict = self.load_config('conf1')
+        self.config_name = 'conf1'
+
+        config_dict = self.load_config(self.config_name)
+
+        self.history_path = 'history.csv'
+        self.history_plots_dir = 'history_plots'
+        self.history_df = self.load_history()
+
         img_transformer = create_img_transformer(config_dict)
         self.train_loader, self.val_loader, self.test_loader = setup_loaders(val_ratio=0.2, img_transformer=img_transformer)
         self.model = create_model(config_dict)
         self.model.to(self.device)
         self.optimizer = create_optimizer(config_dict, self.model)
-        self.schedular = create_lr_scheduler(config_dict, self.optimizer)
+        self.scheduler = create_lr_scheduler(config_dict, self.optimizer)
 
         self.train()
 
@@ -44,12 +56,13 @@ class Pipeline():
             self.epoch(epoch, is_train=False)
             # Step scheduler after the full epoch cycle
             self.scheduler.step()
+            self.print_metrics()
 
     def epoch(self, epoch: int, is_train: bool):
         # 1. Setup mode and data source
         self.model.train() if is_train else self.model.eval()
         data_loader = self.train_loader if is_train else self.val_loader
-        phase_name = "Training" if is_train else "Validation"
+        phase = "train" if is_train else "validation"
         
         running_loss = 0.0
         all_preds = []
@@ -57,7 +70,7 @@ class Pipeline():
 
         # 2. Enable/Disable gradient calculation
         with torch.set_grad_enabled(is_train):
-            for img1, img2, label in tqdm(data_loader, desc=f'{phase_name}. Epoch: {epoch}'):
+            for img1, img2, label in tqdm(data_loader, desc=f'{phase}. Epoch: {epoch}'):
                 img1, img2 = img1.to(self.device), img2.to(self.device)
                 label = label.to(self.device, dtype=torch.float32).unsqueeze(1)
 
@@ -73,12 +86,10 @@ class Pipeline():
 
                 # Statistics accumulation
                 running_loss += loss.item()
-                
-                # Logic for metrics
-                probs = torch.sigmoid(prediction_logits)
+                probs = torch.sigmoid(prediction_logits).detach().cpu() 
                 preds = (probs > 0.5).float()
-                
-                all_preds.append(preds.detach().cpu())
+
+                all_preds.append(preds)
                 all_labels.append(label.detach().cpu())
 
         # 4. Final Metric Calculation
@@ -87,11 +98,35 @@ class Pipeline():
         
         # Calculate mean loss relative to the current loader length
         avg_loss = running_loss / len(data_loader)
-        metrics = self.calculate_metrics(avg_loss, all_preds, all_labels)
+        metrics = self.calculate_metrics(phase, epoch, avg_loss, all_preds, all_labels)
         
-        print(f"\n[{phase_name}] Epoch {epoch}:")
-        print(f"Loss: {metrics['loss']:.4f} | Acc: {metrics['accuracy']:.4f} | "
-              f"Prec: {metrics['precision']:.4f} | Rec: {metrics['recall']:.4f} | F1: {metrics['f1']:.4f}")
+        self.history_df.loc[len(self.history_df)] = metrics
+        print(metrics)
+
+    def calculate_metrics(self, phase: str, epoch: int, loss: float, preds: np.ndarray, labels: np.ndarray) -> dict[str, Any]:
+        """
+        Calculates classification performance metrics.
+        
+        :param loss: The average loss for the epoch.
+        :type loss: float
+        :param preds: Predicted binary labels (0 or 1).
+        :type preds: np.ndarray
+        :param labels: Ground truth binary labels.
+        :type labels: np.ndarray
+        :return: A dictionary containing the calculated metrics.
+        :rtype: dict
+        """
+        metrics = {
+            'config': self.config_name,
+            'phase': phase,
+            'epoch': epoch,
+            'loss': loss,
+            'accuracy': accuracy_score(labels, preds),
+            'precision': precision_score(labels, preds, zero_division=0),
+            'recall': recall_score(labels, preds, zero_division=0),
+            'f1': f1_score(labels, preds, zero_division=0)
+        }
+        return metrics
 
     def optimize_model(self, model: Model):
         pass
@@ -104,6 +139,26 @@ class Pipeline():
         with open(config_file_path, 'r') as f:
             config_json = f.read()
         return json.loads(config_json)
+
+    def load_history(self):
+        if isfile(self.history_path):
+            return pd.read_csv(self.history_path)
+        return pd.DataFrame(columns=['config', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
+
+    def print_metrics(self):
+        config_history_df = self.history_df[self.history_df['config'] == self.config_name]\
+                                           .sort_values(by='epoch', ascending=True)
+        fig, axes = plt.subplots(1, 2)
+        sns.lineplot(data = config_history_df, x='epoch', y='precision', hue='phase',ax=axes[0])
+        sns.lineplot(data = config_history_df, x='epoch', y='accuracy', hue='phase',ax=axes[0])
+        sns.lineplot(data = config_history_df, x='epoch', y='recall', hue='phase', ax=axes[0])
+        sns.lineplot(data = config_history_df, x='epoch', y='f1', hue='phase', ax=axes[0])
+
+        sns.lineplot(data=config_history_df, x='epoch', y='loss', hue='phase', ax=axes[1])
+
+        plt.savefig(join(self.history_plots_dir, self.config_name+'.png'))
+
+
 
 def create_model(config_dict: dict[str, Any]) -> Model:
     encoder = create_encoder(config_dict)
