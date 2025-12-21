@@ -14,7 +14,7 @@ class PaperCNN(Encoder):
         self.conv_bias_std = 10**-2  
 
         self.linear_weight_mean = 0
-        self.linear_weight_std = 10**-1 
+        self.linear_weight_std = 2*10**-1 
 
         self.linear_bias_mean = 0.5
         self.linear_bias_std = 10**-2  

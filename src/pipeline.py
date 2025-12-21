@@ -1,5 +1,5 @@
 import json
-from os.path import join, isfile
+from os.path import join, isfile, makedirs
 from typing import Any
 
 import numpy as np
@@ -29,7 +29,7 @@ class Pipeline():
         self.device = find_device()
         print('device: ', self.device)
 
-        self.max_epochs = 30
+        self.max_epochs = 60
         self.loss_fn = torch.nn.BCEWithLogitsLoss()
 
         self.config_name = 'conf1'
@@ -41,7 +41,8 @@ class Pipeline():
         self.history_df = self.load_history()
 
         img_transformer = create_img_transformer(config_dict)
-        self.train_loader, self.val_loader, self.test_loader = setup_loaders(val_ratio=0.2, img_transformer=img_transformer)
+        self.train_loader, self.val_loader, self.test_loader = setup_loaders(val_ratio=0.2, batch_size=128, 
+                                                                             img_transformer=img_transformer)
         self.model = create_model(config_dict)
         self.model.to(self.device)
         self.optimizer = create_optimizer(config_dict, self.model)
@@ -154,6 +155,7 @@ class Pipeline():
     def print_metrics(self):
         config_history_df = self.history_df[self.history_df['config'] == self.config_name]\
                                            .sort_values(by='epoch', ascending=True)
+        config_history_df = config_history_df[config_history_df['phase'] != 'test']
         metrics_cols = ['precision', 'accuracy', 'recall', 'f1']
         long_df = config_history_df.melt(
             id_vars=['epoch', 'phase'], 
@@ -175,12 +177,13 @@ class Pipeline():
         )
 
         # Refine the legend
-        axes[0].legend(title='Metrics & Phase', bbox_to_anchor=(1.05, 1), loc='upper left')
+        axes[0].legend(title='Metrics & Phase', loc='lower left')
         axes[0].set_title('Model Performance Metrics')
         axes[0].set_ylabel('Score')
 
         sns.lineplot(data=config_history_df, x='epoch', y='loss', hue='phase', ax=axes[1])
 
+        makedirs(self.history_plots_dir, exist_ok=True)
         plt.savefig(join(self.history_plots_dir, self.config_name+'.png'))
 
 
@@ -244,7 +247,7 @@ def create_lr_scheduler(config_dict: dict[str, Any], optimizer: Optimizer) -> LR
 def create_img_transformer(config_dict: dict[str, Any]) -> ImgTransformer:
     return AffineTransformer()
 
-def setup_loaders(val_ratio: float, img_transformer: ImgTransformer) -> tuple[DataLoader, DataLoader, DataLoader]:
+def setup_loaders(val_ratio: float, batch_size: int, img_transformer: ImgTransformer) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Create train, val, and test dataloaders with identity-disjoint splits.
     """
@@ -276,8 +279,8 @@ def setup_loaders(val_ratio: float, img_transformer: ImgTransformer) -> tuple[Da
     full_train_dataset.img_transformer = img_transformer
 
     # 6. Initialize Loaders
-    train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_subset, batch_size=32, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
