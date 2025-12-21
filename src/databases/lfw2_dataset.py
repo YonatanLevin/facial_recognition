@@ -93,5 +93,5 @@ def load_robust_image(path: str) -> Tensor:
     :rtype: Tensor
     """
     with Image.open(path) as img:
-        return to_tensor(img.convert('RGB'))
+        return to_tensor(img.convert('L'))
     
