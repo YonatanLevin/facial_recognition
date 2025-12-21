@@ -2,9 +2,10 @@ from os.path import join
 from typing import Optional
 
 import pandas as pd
-from torch.utils.data import Dataset
 from torch import Tensor
-from torchvision.io import decode_image
+from torch.utils.data import Dataset
+from torchvision.transforms.functional import to_tensor
+from PIL import Image
 
 from databases.img_transformer import ImgTransformer
 
@@ -72,11 +73,25 @@ class LFW2Dataset(Dataset):
         img1_path = self.constract_img_path(name1, idx1)
         img2_path = self.constract_img_path(name2, idx2)
 
-        img1 = decode_image(img1_path).float()
-        img2 = decode_image(img2_path).float()
+        img1 = load_robust_image(img1_path)
+        img2 = load_robust_image(img2_path)
 
         if self.img_transformer:
             img1 = self.img_transformer(img1)
             img2 = self.img_transformer(img2)
 
         return img1, img2, label
+    
+
+def load_robust_image(path: str) -> Tensor:
+    """
+    Load an image with PIL
+    
+    :param path: Image path
+    :type path: str
+    :return: Loaded image tensor
+    :rtype: Tensor
+    """
+    with Image.open(path) as img:
+        return to_tensor(img.convert('RGB'))
+    
