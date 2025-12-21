@@ -4,9 +4,10 @@ from typing import Any
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset
 from torch.optim import Optimizer, SGD 
 from torch.optim.lr_scheduler import LRScheduler, StepLR
+from sklearn.model_selection import GroupShuffleSplit
 from tqdm import tqdm
 import pandas as pd
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -47,22 +48,27 @@ class Pipeline():
         self.scheduler = create_lr_scheduler(config_dict, self.optimizer)
 
         self.train()
+        self.epoch(0, 'test')
 
     def train(self):
         for epoch in range(self.max_epochs):
             # Training Phase
-            self.epoch(epoch, is_train=True)
+            self.epoch(epoch, phase='train')
             # Validation Phase
-            self.epoch(epoch, is_train=False)
+            self.epoch(epoch, phase='eval')
             # Step scheduler after the full epoch cycle
             self.scheduler.step()
             self.print_metrics()
 
-    def epoch(self, epoch: int, is_train: bool):
+    def epoch(self, epoch: int, phase: str):
         # 1. Setup mode and data source
-        self.model.train() if is_train else self.model.eval()
-        data_loader = self.train_loader if is_train else self.val_loader
-        phase = "train" if is_train else "validation"
+        is_train = phase == 'train'
+        if is_train:
+            self.model.train()
+            data_loader = self.train_loader
+        else:
+            self.model.eval()
+            data_loader = self.val_loader if phase == 'eval' else self.test_loader
         
         running_loss = 0.0
         all_preds = []
@@ -148,16 +154,33 @@ class Pipeline():
     def print_metrics(self):
         config_history_df = self.history_df[self.history_df['config'] == self.config_name]\
                                            .sort_values(by='epoch', ascending=True)
+        metrics_cols = ['precision', 'accuracy', 'recall', 'f1']
+        long_df = config_history_df.melt(
+            id_vars=['epoch', 'phase'], 
+            value_vars=metrics_cols, 
+            var_name='metric', 
+            value_name='score'
+        )
+
         fig, axes = plt.subplots(1, 2)
-        sns.lineplot(data = config_history_df, x='epoch', y='precision', hue='phase',ax=axes[0])
-        sns.lineplot(data = config_history_df, x='epoch', y='accuracy', hue='phase',ax=axes[0])
-        sns.lineplot(data = config_history_df, x='epoch', y='recall', hue='phase', ax=axes[0])
-        sns.lineplot(data = config_history_df, x='epoch', y='f1', hue='phase', ax=axes[0])
+        plot = sns.lineplot(
+            data=long_df, 
+            x='epoch', 
+            y='score', 
+            hue='metric',   # Different color for each metric
+            style='phase',  # Different line style (solid/dashed) for train/val
+            markers=True,   # Optional: add markers for better readability
+            ax=axes[0]
+        )
+
+        # Refine the legend
+        axes[0].legend(title='Metrics & Phase', bbox_to_anchor=(1.05, 1), loc='upper left')
+        axes[0].set_title('Model Performance Metrics')
+        axes[0].set_ylabel('Score')
 
         sns.lineplot(data=config_history_df, x='epoch', y='loss', hue='phase', ax=axes[1])
 
         plt.savefig(join(self.history_plots_dir, self.config_name+'.png'))
-
 
 
 def create_model(config_dict: dict[str, Any]) -> Model:
@@ -221,25 +244,39 @@ def create_img_transformer(config_dict: dict[str, Any]) -> ImgTransformer:
     return AffineTransformer()
 
 def setup_loaders(val_ratio: float, img_transformer: ImgTransformer) -> tuple[DataLoader, DataLoader, DataLoader]:
-        """
-        Create train, val and test dataloaders
-        
-        :param val_ration: Description
-        :type val_ration: float
-        :return: Description
-        :rtype: tuple[DataLoader, DataLoader, DataLoader]
-        """
-        train_dataset = LFW2Dataset(is_train=True)
-        test_dataset = LFW2Dataset(is_train=False)
+    """
+    Create train, val, and test dataloaders with identity-disjoint splits.
+    """
+    # 1. Initialize original datasets
+    full_train_dataset = LFW2Dataset(is_train=True)
+    test_dataset = LFW2Dataset(is_train=False)
 
-        total_size = len(train_dataset)
-        val_size = int(total_size * val_ratio)
-        train_size = total_size - val_size
-         
-        train_dataset, val_dataset = random_split(train_dataset, [train_size, val_size])
-        train_dataset.img_transformer = img_transformer
+    # 2. Extract names to create groups
+    # Assuming full_train_dataset.df contains the columns 'name1' and 'name2'
+    df = full_train_dataset.pairs_df
+    
+    # We define a 'group' for each row. To be strict, if a row contains 
+    # Name A and Name B, that row belongs to a meta-group of those two names.
+    # A simple approach is to use the primary name or a concatenated unique ID.
+    groups = df['name1'] 
 
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
-        test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-        return train_loader, val_loader, test_loader
+    # 3. Perform Group-wise Splitting
+    gss = GroupShuffleSplit(n_splits=1, test_size=val_ratio, random_state=42)
+    
+    # split() yields indices for the train and val sets
+    train_idx, val_idx = next(gss.split(X=df, y=None, groups=groups))
+
+    # 4. Create Subsets
+    train_subset = Subset(full_train_dataset, train_idx)
+    val_subset = Subset(full_train_dataset, val_idx)
+
+    # 5. Apply transformations
+    # Note: Accessing the underlying dataset to set the transformer
+    full_train_dataset.img_transformer = img_transformer
+
+    # 6. Initialize Loaders
+    train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
+    val_loader = DataLoader(val_subset, batch_size=32, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+    return train_loader, val_loader, test_loader
