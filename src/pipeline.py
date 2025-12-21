@@ -4,6 +4,7 @@ from os.path import join, isfile
 from typing import Any
 
 import numpy as np
+import networkx as nx
 import torch
 from torch.utils.data import DataLoader, Subset
 from torch.optim import Optimizer, SGD 
@@ -250,38 +251,74 @@ def create_img_transformer(config_dict: dict[str, Any]) -> ImgTransformer:
 
 def setup_loaders(val_ratio: float, batch_size: int, img_transformer: ImgTransformer) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
-    Create train, val, and test dataloaders with identity-disjoint splits.
+    Create identity-disjoint loaders using Graph Connected Components.
+    Splits are performed greedily to reach the target validation ratio.
     """
     # 1. Initialize original datasets
     full_train_dataset = LFW2Dataset(is_train=True)
     test_dataset = LFW2Dataset(is_train=False)
-
-    # 2. Extract names to create groups
-    # Assuming full_train_dataset.df contains the columns 'name1' and 'name2'
     df = full_train_dataset.pairs_df
+
+    component_indices = calculate_data_connected_components(df)
+    total_samples = len(df)
+    target_val_size = int(total_samples * val_ratio)
     
-    # We define a 'group' for each row. To be strict, if a row contains 
-    # Name A and Name B, that row belongs to a meta-group of those two names.
-    # A simple approach is to use the primary name or a concatenated unique ID.
-    groups = df['name1'] 
+    val_idx = []
+    train_idx = []
+    current_val_size = 0
 
-    # 3. Perform Group-wise Splitting
-    gss = GroupShuffleSplit(n_splits=1, test_size=val_ratio, random_state=42)
-    
-    # split() yields indices for the train and val sets
-    train_idx, val_idx = next(gss.split(X=df, y=None, groups=groups))
+    # We fill the validation set greedily until we hit the ratio
+    for indices in component_indices:
+        if current_val_size + len(indices) <= target_val_size:
+            val_idx.extend(indices)
+            current_val_size += len(indices)
+        else:
+            train_idx.extend(indices)
 
-    # 4. Create Subsets
-    train_subset = Subset(full_train_dataset, train_idx)
-    val_subset = Subset(full_train_dataset, val_idx)
+    # 5. Reporting Statistics
+    def print_stats(indices, name):
+        subset_df = df.iloc[indices]
+        pos = (subset_df['name1'] == subset_df['name2']).sum()
+        neg = len(subset_df) - pos
+        print(f"{name} Set: Positive={pos} ({pos/len(subset_df):.3f}%), Negative={neg}, Total={len(subset_df)}")
 
-    # 5. Apply transformations
-    # Note: Accessing the underlying dataset to set the transformer
+    print_stats(train_idx, "Train")
+    print_stats(val_idx, "Validation")
+
+    # 6. Create Loaders
     full_train_dataset.img_transformer = img_transformer
-
-    # 6. Initialize Loaders
-    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(Subset(full_train_dataset, train_idx), batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(Subset(full_train_dataset, val_idx), batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader
+
+def calculate_data_connected_components(df: pd.DataFrame) -> list[list[int]]:
+    """
+    Calculate the person connected components in a dataframe
+    
+    :param df: The dataframe
+    :type df: pd.DataFrame
+    :return: The connected componets' indexes
+    :rtype: list[list[int]]
+    """
+    G = nx.Graph()
+    for idx, row in df.iterrows():
+        # Add edge between name1 and name2; store index to retrieve later
+        G.add_edge(row['name1'], row['name2'])
+        if 'indices' not in G[row['name1']][row['name2']]:
+            G[row['name1']][row['name2']]['indices'] = []
+        G[row['name1']][row['name2']]['indices'].append(idx)
+
+    # Find Connected Components and map back to DataFrame indices
+    components = list(nx.connected_components(G))
+    component_indices = []
+    
+    for comp in components:
+        # Get all row indices where both name1 and name2 are in this component
+        indices = df[df['name1'].isin(comp) & df['name2'].isin(comp)].index.tolist()
+        component_indices.append(indices)
+
+    # Sort components by the number of samples they contain
+    component_indices.sort(key=len, reverse=False)
+    return component_indices
