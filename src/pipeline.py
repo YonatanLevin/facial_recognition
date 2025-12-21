@@ -162,7 +162,8 @@ class Pipeline():
             value_name='score'
         )
 
-        fig, axes = plt.subplots(1, 2)
+        fig, axes = plt.subplots(2, 1)
+        fig.set_size_inches(10, 20)
         plot = sns.lineplot(
             data=long_df, 
             x='epoch', 
