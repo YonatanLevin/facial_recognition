@@ -241,7 +241,7 @@ def create_head(config_dict: dict[str, Any]) -> ComparisonHead:
             raise ValueError(f'Unknown head: {head_name}')
 
 def create_optimizer(config_dict: dict[str, Any], model: Model) -> Optimizer:
-    return SGD(model.parameters())
+    return SGD(model.parameters(), weight_decay = 0.01)
 
 def create_lr_scheduler(config_dict: dict[str, Any], optimizer: Optimizer) -> LRScheduler:
     return StepLR(optimizer, step_size=1, gamma=0.99) # Example: decay LR by gamma every step_size epochs
@@ -265,18 +265,19 @@ def setup_loaders(val_ratio: float, batch_size: int, img_transformer: ImgTransfo
     
     val_idx = []
     train_idx = []
-    current_val_size = 0
 
-    # We fill the validation set greedily until we hit the ratio
+    # Assign components based on val_ratio probability
     for indices in component_indices:
-        if current_val_size + len(indices) <= target_val_size:
+        if np.random.rand() < val_ratio:
             val_idx.extend(indices)
-            current_val_size += len(indices)
         else:
             train_idx.extend(indices)
 
     # 5. Reporting Statistics
     def print_stats(indices, name):
+        if not indices:
+            print(f"{name} Set: Empty")
+            return
         subset_df = df.iloc[indices]
         pos = (subset_df['name1'] == subset_df['name2']).sum()
         neg = len(subset_df) - pos
@@ -286,9 +287,13 @@ def setup_loaders(val_ratio: float, batch_size: int, img_transformer: ImgTransfo
     print_stats(val_idx, "Validation")
 
     # 6. Create Loaders
-    full_train_dataset.img_transformer = img_transformer
-    train_loader = DataLoader(Subset(full_train_dataset, train_idx), batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(Subset(full_train_dataset, val_idx), batch_size=batch_size, shuffle=False)
+    
+    train_dataset = Subset(full_train_dataset, train_idx)
+    train_dataset.img_transformer = img_transformer
+    val_dataset = Subset(full_train_dataset, val_idx)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader

@@ -41,6 +41,8 @@ class PaperCNN(Encoder):
             Sigmoid()
         )
 
+        self.weights_init()
+
     def weights_init(self):
         def weights_init_(m: Module):
             if isinstance(m, Conv2d):
