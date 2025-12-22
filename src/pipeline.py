@@ -63,6 +63,8 @@ class Pipeline():
             self.scheduler.step()
             self.print_metrics()
 
+        self.history_df.to_csv(index=False)
+
     def epoch(self, epoch: int, phase: str):
         # 1. Setup mode and data source
         is_train = phase == 'train'
@@ -151,7 +153,7 @@ class Pipeline():
 
     def load_history(self):
         if isfile(self.history_path):
-            return pd.read_csv(self.history_path)
+            return pd.read_csv(self.history_path, index_col=None)
         return pd.DataFrame(columns=['config', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
 
     def setup_loaders(self) -> tuple[DataLoader, DataLoader, DataLoader]:
