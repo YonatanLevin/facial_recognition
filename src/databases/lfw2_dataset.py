@@ -2,6 +2,7 @@ from os.path import join
 from typing import Optional
 
 import pandas as pd
+import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import to_tensor

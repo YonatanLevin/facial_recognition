@@ -6,9 +6,11 @@ from typing import Any
 import numpy as np
 import networkx as nx
 import torch
+from torch import Tensor
 from torch.utils.data import DataLoader, Subset
 from torch.optim import Optimizer, SGD 
 from torch.optim.lr_scheduler import LRScheduler, StepLR
+from torchmetrics import MetricCollection, Accuracy, Precision, Recall, F1Score
 from tqdm import tqdm
 import pandas as pd
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -43,12 +45,15 @@ class Pipeline():
 
         self.val_ratio=0.2
         self.batch_size = 128
+        self.num_workers = 4
         self.img_transformer = create_img_transformer(self.config_dict)
         self.train_loader, self.val_loader, self.test_loader = self.setup_loaders()
         self.model = create_model(self.config_dict)
         self.model.to(self.device)
         self.optimizer = create_optimizer(self.config_dict, self.model)
         self.scheduler = create_lr_scheduler(self.config_dict, self.optimizer)
+
+        self.train_metrics, self.val_metrics = self.setup_metrics()
 
         self.train()
         # self.epoch(0, 'test')
@@ -66,53 +71,55 @@ class Pipeline():
         self.history_df.to_csv(index=False)
 
     def epoch(self, epoch: int, phase: str):
-        # 1. Setup mode and data source
         is_train = phase == 'train'
-        if is_train:
-            self.model.train()
-            data_loader = self.train_loader
-        else:
-            self.model.eval()
-            data_loader = self.val_loader if phase == 'eval' else self.test_loader
+        self.model.train() if is_train else self.model.eval()
+        data_loader = self.train_loader if is_train else (self.val_loader if phase == 'eval' else self.test_loader)
         
-        running_loss = 0.0
-        all_preds = []
-        all_labels = []
+        # Select the appropriate metric tracker
+        current_metrics = self.train_metrics if is_train else self.val_metrics
+        current_metrics.reset()
 
-        # 2. Enable/Disable gradient calculation
+        running_loss = torch.tensor(0.0).to(self.device)
+
         with torch.set_grad_enabled(is_train):
             for img1, img2, label in tqdm(data_loader, desc=f'{phase}. Epoch: {epoch}'):
-                img1, img2 = img1.to(self.device), img2.to(self.device)
-                label = label.to(self.device, dtype=torch.float32).unsqueeze(1)
+                img1, img2 = img1.to(self.device, non_blocking=True), img2.to(self.device, non_blocking=True)
+                label = label.to(self.device, non_blocking=True, dtype=torch.float32).unsqueeze(1)
 
-                # Forward pass
                 prediction_logits = self.model(img1, img2, False)
                 loss = self.loss_fn(prediction_logits, label)
                 
-                # 3. Optimization step (only during training)
                 if is_train:
                     self.optimizer.zero_grad()
                     loss.backward()
                     self.optimizer.step()
 
-                # Statistics accumulation
-                running_loss += loss.item()
-                probs = torch.sigmoid(prediction_logits).detach().cpu() 
-                preds = (probs > 0.5).float()
+                running_loss += loss
+                
+                # Update metrics on GPU
+                probs = torch.sigmoid(prediction_logits)
+                current_metrics.update(probs, label)
 
-                all_preds.append(preds)
-                all_labels.append(label.detach().cpu())
-
-        # 4. Final Metric Calculation
-        all_preds = torch.cat(all_preds).numpy()
-        all_labels = torch.cat(all_labels).numpy()
+        # Compute final metrics for the epoch
+        # This keeps the bulk of calculations on the GPU [cite: 126]
+        computed_metrics = current_metrics.compute()
         
-        # Calculate mean loss relative to the current loader length
-        avg_loss = running_loss / len(data_loader)
-        metrics = self.calculate_metrics(phase, epoch, avg_loss, all_preds, all_labels)
+        avg_loss = running_loss.item() / len(data_loader)
         
-        self.history_df.loc[len(self.history_df)] = metrics
-        print(metrics)
+        # Prepare metrics for history_df (move to CPU only at the very end)
+        epoch_results = {
+            'config': self.config_name,
+            'phase': phase,
+            'epoch': epoch,
+            'loss': avg_loss,
+            'accuracy': computed_metrics[f'{phase}_accuracy'].item(),
+            'precision': computed_metrics[f'{phase}_precision'].item(),
+            'recall': computed_metrics[f'{phase}_recall'].item(),
+            'f1': computed_metrics[f'{phase}_f1'].item()
+        }
+        
+        self.history_df.loc[len(self.history_df)] = epoch_results
+        print(epoch_results)
 
     def calculate_metrics(self, phase: str, epoch: int, loss: float, preds: np.ndarray, labels: np.ndarray) -> dict[str, Any]:
         """
@@ -167,9 +174,9 @@ class Pipeline():
         
         train_dataset, val_dataset = self.split_train_val(resize_size)
 
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
-        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
 
         return train_loader, val_loader, test_loader
     
@@ -217,6 +224,24 @@ class Pipeline():
         val_dataset = Subset(full_val_base, val_idx)
         
         return train_dataset, val_dataset
+
+    def setup_metrics(self) -> tuple[MetricCollection, MetricCollection]:
+        """
+        Setup train and val metrics
+        
+        :return: Metric collections
+        :rtype: tuple[MetricCollection, MetricCollection]
+        """
+        metrics = MetricCollection({
+            'accuracy': Accuracy(task='binary'),
+            'precision': Precision(task='binary'),
+            'recall': Recall(task='binary'),
+            'f1': F1Score(task='binary')
+        })
+        self.train_metrics = metrics.clone(prefix='train_').to(self.device)
+        self.val_metrics = metrics.clone(prefix='val_').to(self.device)
+
+        return self.train_metrics, self.val_metrics
 
     def print_metrics(self):
         config_history_df = self.history_df[self.history_df['config'] == self.config_name]\
