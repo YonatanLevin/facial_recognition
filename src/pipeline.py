@@ -13,7 +13,6 @@ from torch.optim.lr_scheduler import LRScheduler, StepLR
 from torchmetrics import MetricCollection, Accuracy, Precision, Recall, F1Score
 from tqdm import tqdm
 import pandas as pd
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from matplotlib import pyplot as plt
 import seaborn as sns
 
@@ -239,7 +238,7 @@ class Pipeline():
             'f1': F1Score(task='binary')
         })
         self.train_metrics = metrics.clone(prefix='train_').to(self.device)
-        self.val_metrics = metrics.clone(prefix='val_').to(self.device)
+        self.val_metrics = metrics.clone(prefix='eval_').to(self.device)
 
         return self.train_metrics, self.val_metrics
 
