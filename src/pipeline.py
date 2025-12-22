@@ -6,7 +6,6 @@ from typing import Any
 import numpy as np
 import networkx as nx
 import torch
-from torch import Tensor
 from torch.utils.data import DataLoader, Subset
 from torch.optim import Optimizer, SGD 
 from torch.optim.lr_scheduler import LRScheduler, StepLR
@@ -135,7 +134,7 @@ class Pipeline():
     def load_history(self):
         if isfile(self.history_path):
             history_df = pd.read_csv(self.history_path, index_col=None)
-            return history_df[history_df['config' != self.config_name]]
+            return history_df[history_df['config'] != self.config_name]
         return pd.DataFrame(columns=['config', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
 
     def setup_loaders(self) -> tuple[DataLoader, DataLoader, DataLoader]:
