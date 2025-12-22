@@ -247,7 +247,10 @@ class Pipeline():
         axes[0].set_title('Model Performance Metrics')
         axes[0].set_ylabel('Score')
 
+        axes[0].set_ylim(bottom=0, top=1)
+
         sns.lineplot(data=config_history_df, x='epoch', y='loss', hue='phase', ax=axes[1])
+        axes[1].set_ylim(bottom=0)
 
         makedirs(self.history_plots_dir, exist_ok=True)
         plt.savefig(join(self.history_plots_dir, self.config_name+'.png'))
