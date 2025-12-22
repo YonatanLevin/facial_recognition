@@ -67,7 +67,7 @@ class Pipeline():
             self.scheduler.step()
             self.print_metrics()
 
-        self.history_df.to_csv(index=False)
+        self.history_df.to_csv(self.history_path,index=False)
 
     def epoch(self, epoch: int, phase: str):
         is_train = phase == 'train'
