@@ -120,31 +120,6 @@ class Pipeline():
         self.history_df.loc[len(self.history_df)] = epoch_results
         print(epoch_results)
 
-    def calculate_metrics(self, phase: str, epoch: int, loss: float, preds: np.ndarray, labels: np.ndarray) -> dict[str, Any]:
-        """
-        Calculates classification performance metrics.
-        
-        :param loss: The average loss for the epoch.
-        :type loss: float
-        :param preds: Predicted binary labels (0 or 1).
-        :type preds: np.ndarray
-        :param labels: Ground truth binary labels.
-        :type labels: np.ndarray
-        :return: A dictionary containing the calculated metrics.
-        :rtype: dict
-        """
-        metrics = {
-            'config': self.config_name,
-            'phase': phase,
-            'epoch': epoch,
-            'loss': loss,
-            'accuracy': accuracy_score(labels, preds),
-            'precision': precision_score(labels, preds, zero_division=0),
-            'recall': recall_score(labels, preds, zero_division=0),
-            'f1': f1_score(labels, preds, zero_division=0)
-        }
-        return metrics
-
     def optimize_model(self, model: Model):
         pass
 
@@ -159,7 +134,8 @@ class Pipeline():
 
     def load_history(self):
         if isfile(self.history_path):
-            return pd.read_csv(self.history_path, index_col=None)
+            history_df = pd.read_csv(self.history_path, index_col=None)
+            return history_df[history_df['config' != self.config_name]]
         return pd.DataFrame(columns=['config', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
 
     def setup_loaders(self) -> tuple[DataLoader, DataLoader, DataLoader]:
@@ -275,6 +251,7 @@ class Pipeline():
 
         makedirs(self.history_plots_dir, exist_ok=True)
         plt.savefig(join(self.history_plots_dir, self.config_name+'.png'))
+        plt.close()
 
 
 def create_model(config_dict: dict[str, Any]) -> Model:
