@@ -9,7 +9,6 @@ import torch
 from torch.utils.data import DataLoader, Subset
 from torch.optim import Optimizer, SGD 
 from torch.optim.lr_scheduler import LRScheduler, StepLR
-from sklearn.model_selection import GroupShuffleSplit
 from tqdm import tqdm
 import pandas as pd
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -34,24 +33,25 @@ class Pipeline():
         self.max_epochs = 60
         self.loss_fn = torch.nn.BCEWithLogitsLoss()
 
-        self.config_name = 'conf1'
+        self.config_name = 'conf1_1'
 
-        config_dict = self.load_config(self.config_name)
+        self.config_dict = self.load_config(self.config_name)
 
         self.history_path = 'history.csv'
         self.history_plots_dir = 'history_plots'
         self.history_df = self.load_history()
 
-        img_transformer = create_img_transformer(config_dict)
-        self.train_loader, self.val_loader, self.test_loader = setup_loaders(val_ratio=0.2, batch_size=128, 
-                                                                             img_transformer=img_transformer)
-        self.model = create_model(config_dict)
+        self.val_ratio=0.2
+        self.batch_size = 128
+        self.img_transformer = create_img_transformer(self.config_dict)
+        self.train_loader, self.val_loader, self.test_loader = self.setup_loaders()
+        self.model = create_model(self.config_dict)
         self.model.to(self.device)
-        self.optimizer = create_optimizer(config_dict, self.model)
-        self.scheduler = create_lr_scheduler(config_dict, self.optimizer)
+        self.optimizer = create_optimizer(self.config_dict, self.model)
+        self.scheduler = create_lr_scheduler(self.config_dict, self.optimizer)
 
         self.train()
-        self.epoch(0, 'test')
+        # self.epoch(0, 'test')
 
     def train(self):
         for epoch in range(self.max_epochs):
@@ -154,6 +154,67 @@ class Pipeline():
             return pd.read_csv(self.history_path)
         return pd.DataFrame(columns=['config', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
 
+    def setup_loaders(self) -> tuple[DataLoader, DataLoader, DataLoader]:
+        """
+        Create identity-disjoint loaders using Graph Connected Components.
+        Splits are performed greedily to reach the target validation ratio.
+        """
+        # 1. Initialize original datasets
+        resize_size = self.config_dict.get('resize_size')
+        test_dataset = LFW2Dataset(is_train=False, resize_size=resize_size)
+        
+        train_dataset, val_dataset = self.split_train_val(resize_size)
+
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
+        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
+
+        return train_loader, val_loader, test_loader
+    
+    def split_train_val(self, resize_size: tuple[int,int]) -> tuple[Subset, Subset]:
+        """
+        Load and split the full train dataset to train and val datasets.
+        Split connected components based on val_ratio probability.
+
+        :param resize_size: The resize_size
+        :type resize_size: tuple[int, int]
+        :return: (train_dataset, test_dataset)
+        :rtype: tuple[Subset, Subset]
+        """
+        full_train_base = LFW2Dataset(is_train=True, img_transformer=self.img_transformer, resize_size=resize_size)
+        full_val_base = LFW2Dataset(is_train=True, img_transformer=None, resize_size=resize_size)
+
+        df = full_train_base.pairs_df
+        component_indices = calculate_data_connected_components(df)
+        
+        val_idx = []
+        train_idx = []
+        # Assign components based on val_ratio probability
+        for indices in component_indices:
+            if np.random.rand() < self.val_ratio:
+                val_idx.extend(indices)
+            else:
+                train_idx.extend(indices)
+
+        # Reporting Statistics
+        def print_stats(indices, name):
+            if not indices:
+                print(f"{name} Set: Empty")
+                return
+            subset_df = df.iloc[indices]
+            pos = (subset_df['name1'] == subset_df['name2']).sum()
+            neg = len(subset_df) - pos
+            print(f"{name} Set: Positive={pos} ({pos/len(subset_df):.3f}%), Negative={neg}, Total={len(subset_df)}")
+
+        print_stats(train_idx, "Train")
+        print_stats(val_idx, "Validation")
+
+        # 6. Create Subsets
+        train_dataset = Subset(full_train_base, train_idx)
+        val_dataset = Subset(full_val_base, val_idx)
+        
+        return train_dataset, val_dataset
+
     def print_metrics(self):
         config_history_df = self.history_df[self.history_df['config'] == self.config_name]\
                                            .sort_values(by='epoch', ascending=True)
@@ -248,55 +309,6 @@ def create_lr_scheduler(config_dict: dict[str, Any], optimizer: Optimizer) -> LR
 
 def create_img_transformer(config_dict: dict[str, Any]) -> ImgTransformer:
     return AffineTransformer()
-
-def setup_loaders(val_ratio: float, batch_size: int, img_transformer: ImgTransformer) -> tuple[DataLoader, DataLoader, DataLoader]:
-    """
-    Create identity-disjoint loaders using Graph Connected Components.
-    Splits are performed greedily to reach the target validation ratio.
-    """
-    # 1. Initialize original datasets
-    full_train_dataset = LFW2Dataset(is_train=True)
-    test_dataset = LFW2Dataset(is_train=False)
-    df = full_train_dataset.pairs_df
-
-    component_indices = calculate_data_connected_components(df)
-    total_samples = len(df)
-    target_val_size = int(total_samples * val_ratio)
-    
-    val_idx = []
-    train_idx = []
-
-    # Assign components based on val_ratio probability
-    for indices in component_indices:
-        if np.random.rand() < val_ratio:
-            val_idx.extend(indices)
-        else:
-            train_idx.extend(indices)
-
-    # 5. Reporting Statistics
-    def print_stats(indices, name):
-        if not indices:
-            print(f"{name} Set: Empty")
-            return
-        subset_df = df.iloc[indices]
-        pos = (subset_df['name1'] == subset_df['name2']).sum()
-        neg = len(subset_df) - pos
-        print(f"{name} Set: Positive={pos} ({pos/len(subset_df):.3f}%), Negative={neg}, Total={len(subset_df)}")
-
-    print_stats(train_idx, "Train")
-    print_stats(val_idx, "Validation")
-
-    # 6. Create Loaders
-    
-    train_dataset = Subset(full_train_dataset, train_idx)
-    train_dataset.img_transformer = img_transformer
-    val_dataset = Subset(full_train_dataset, val_idx)
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    return train_loader, val_loader, test_loader
 
 def calculate_data_connected_components(df: pd.DataFrame) -> list[list[int]]:
     """

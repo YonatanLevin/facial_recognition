@@ -10,12 +10,14 @@ from PIL import Image
 from databases.img_transformer import ImgTransformer
 
 class LFW2Dataset(Dataset):
-    def __init__(self, is_train: bool, img_transformer: Optional[ImgTransformer] = None):
+    def __init__(self, is_train: bool, img_transformer: Optional[ImgTransformer] = None, 
+                 resize_size: tuple[int, int] | None = None):
         super().__init__()
         self.data_main_path = 'data'
         self.imgs_main_path = join(self.data_main_path, 'lfw2')
         self.is_train = is_train
         self.img_transformer = img_transformer
+        self.resize_size = resize_size
         
         self.pairs_df = self.parse_pairs()
         
@@ -73,8 +75,8 @@ class LFW2Dataset(Dataset):
         img1_path = self.constract_img_path(name1, idx1)
         img2_path = self.constract_img_path(name2, idx2)
 
-        img1 = load_robust_image(img1_path)
-        img2 = load_robust_image(img2_path)
+        img1 = self.load_robust_image(img1_path)
+        img2 = self.load_robust_image(img2_path)
 
         if self.img_transformer:
             img1 = self.img_transformer(img1)
@@ -83,15 +85,18 @@ class LFW2Dataset(Dataset):
         return img1, img2, label
     
 
-def load_robust_image(path: str) -> Tensor:
-    """
-    Load an image with PIL
-    
-    :param path: Image path
-    :type path: str
-    :return: Loaded image tensor
-    :rtype: Tensor
-    """
-    with Image.open(path) as img:
-        return to_tensor(img.convert('L'))
-    
+    def load_robust_image(self, path: str) -> Tensor:
+        """
+        Load an image with PIL
+        
+        :param path: Image path
+        :type path: str
+        :return: Loaded image tensor
+        :rtype: Tensor
+        """
+        with Image.open(path) as img:
+            img = img.convert('L')
+            if self.resize_size is not None:
+               img = img.resize(self.resize_size, Image.Resampling.LANCZOS)
+            return to_tensor(img)
+        

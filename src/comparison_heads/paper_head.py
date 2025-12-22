@@ -1,5 +1,4 @@
 import torch
-from torch import Module
 import torch.nn.init as init
 
 from comparison_heads.comparison_head import ComparisonHead
