@@ -192,6 +192,7 @@ class Pipeline():
         val_idx = []
         train_idx = []
         # Assign components based on val_ratio probability
+        np.random.seed(42)
         for indices in component_indices:
             if np.random.rand() < self.val_ratio:
                 val_idx.extend(indices)
@@ -304,7 +305,7 @@ def create_head(config_dict: dict[str, Any]) -> ComparisonHead:
             raise ValueError(f'Unknown head: {head_name}')
 
 def create_optimizer(config_dict: dict[str, Any], model: Model) -> Optimizer:
-    return SGD(model.parameters(), weight_decay = 0.01)
+    return SGD(model.parameters(), weight_decay = 0.01, momentum=0.5)
 
 def create_lr_scheduler(config_dict: dict[str, Any], optimizer: Optimizer) -> LRScheduler:
     return StepLR(optimizer, step_size=1, gamma=0.99) # Example: decay LR by gamma every step_size epochs
