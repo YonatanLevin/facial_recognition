@@ -1,5 +1,5 @@
 import json
-from os import makedirs
+from os import makedirs, listdir
 from os.path import join, isfile 
 from typing import Any
 
@@ -26,34 +26,42 @@ from comparison_heads.paper_head import PaperHead
 
 class Pipeline():
     def __init__(self):
-        self.config_dir = 'model_configs'
         self.device = find_device()
         print('device: ', self.device)
 
         self.max_epochs = 60
-        self.loss_fn = torch.nn.BCEWithLogitsLoss()
-
-        self.config_name = 'conf1_1'
-
-        self.config_dict = self.load_config(self.config_name)
+        self.val_ratio=0.2
+        self.batch_size = 128
+        self.num_workers = 4
 
         self.history_path = 'history.csv'
         self.history_plots_dir = 'history_plots'
         self.history_df = self.load_history()
 
-        self.val_ratio=0.2
-        self.batch_size = 128
-        self.num_workers = 4
-        self.img_transformer = create_img_transformer(self.config_dict)
+        self.config_dir = 'model_configs'
+        self.config_name, self.config_dict = None, None
+        self.train_loader, self.val_loader, self.test_loader = None, None, None
+        self.img_transformer = None
+        self.loss_fn, self.optimizer, self.scheduler = None, None, None
+
+    def execute_config(self):
+        self.config_name = self.request_config_name()
+        self.config_dict = self.load_config()
+
+        if self.config_dict == None:
+            return
+        
         self.train_loader, self.val_loader, self.test_loader = self.setup_loaders()
+        self.img_transformer = create_img_transformer(self.config_dict)
         self.model = create_model(self.config_dict)
         self.model.to(self.device)
+        self.loss_fn = torch.nn.BCEWithLogitsLoss()
         self.optimizer = create_optimizer(self.config_dict, self.model)
         self.scheduler = create_lr_scheduler(self.config_dict, self.optimizer)
-
         self.train_metrics, self.val_metrics = self.setup_metrics()
-
+        
         self.train()
+
         # self.epoch(0, 'test')
 
     def train(self):
@@ -66,6 +74,7 @@ class Pipeline():
             self.scheduler.step()
             self.print_metrics()
 
+        self.history_df = self.history_df[self.history_df['config'] != self.config_name]
         self.history_df.to_csv(self.history_path,index=False)
 
     def epoch(self, epoch: int, phase: str):
@@ -122,19 +131,18 @@ class Pipeline():
     def optimize_model(self, model: Model):
         pass
 
-    def load_config(self, config_name: str | None = None):
-        if config_name is None:
-            config_name = input('config name:')
-        
-        config_file_path = join(self.config_dir, config_name + '.json')
-        with open(config_file_path, 'r') as f:
-            config_json = f.read()
-        return json.loads(config_json)
+    def load_config(self) -> dict[str, int] | None:
+        config_file_path = join(self.config_dir, self.config_name + '.json')
+        if isfile(config_file_path):
+            with open(config_file_path, 'r') as f:
+                config_json = f.read()
+            return json.loads(config_json)
+        return None
 
     def load_history(self):
         if isfile(self.history_path):
             history_df = pd.read_csv(self.history_path, index_col=None)
-            return history_df[history_df['config'] != self.config_name]
+            return history_df
         return pd.DataFrame(columns=['config', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
 
     def setup_loaders(self) -> tuple[DataLoader, DataLoader, DataLoader]:
@@ -254,6 +262,17 @@ class Pipeline():
         makedirs(self.history_plots_dir, exist_ok=True)
         plt.savefig(join(self.history_plots_dir, self.config_name+'.png'))
         plt.close()
+
+    def print_best_configs_metrics(self):
+        eval_df = self.history_df.query("phase == 'eval'")
+        best_f1_per_conf = eval_df.loc[eval_df.groupby('config')['f1'].idxmax()]
+        print(best_f1_per_conf)
+
+    def request_config_name(self) -> str:
+        configs = listdir(self.config_dir)
+        extentionless_configs = [config.split('.')[0] for config in configs]
+        print('configs: ', extentionless_configs)
+        return input('config name:')
 
 
 def create_model(config_dict: dict[str, Any]) -> Model:

@@ -85,7 +85,6 @@ class LFW2Dataset(Dataset):
 
         return img1, img2, label
     
-
     def load_robust_image(self, path: str) -> Tensor:
         """
         Load an image with PIL
