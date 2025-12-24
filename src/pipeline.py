@@ -152,9 +152,10 @@ class Pipeline():
         """
         # 1. Initialize original datasets
         resize_size = self.config_dict.get('resize_size')
-        test_dataset = LFW2Dataset(is_train=False, resize_size=resize_size)
+        use_foreground = self.config_dict.get('use_foreground')
+        test_dataset = LFW2Dataset(is_train=False, resize_size=resize_size, use_foreground=use_foreground)
         
-        train_dataset, val_dataset = self.split_train_val(resize_size)
+        train_dataset, val_dataset = self.split_train_val(resize_size, use_foreground=use_foreground)
 
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
         val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
@@ -162,7 +163,7 @@ class Pipeline():
 
         return train_loader, val_loader, test_loader
     
-    def split_train_val(self, resize_size: tuple[int,int]) -> tuple[Subset, Subset]:
+    def split_train_val(self, resize_size: tuple[int,int], use_foreground: bool | None) -> tuple[Subset, Subset]:
         """
         Load and split the full train dataset to train and val datasets.
         Split connected components based on val_ratio probability.
@@ -172,8 +173,10 @@ class Pipeline():
         :return: (train_dataset, test_dataset)
         :rtype: tuple[Subset, Subset]
         """
-        full_train_base = LFW2Dataset(is_train=True, img_transformer=self.img_transformer, resize_size=resize_size)
-        full_val_base = LFW2Dataset(is_train=True, img_transformer=None, resize_size=resize_size)
+        full_train_base = LFW2Dataset(is_train=True, img_transformer=self.img_transformer, 
+                                      resize_size=resize_size, use_foreground=use_foreground)
+        full_val_base = LFW2Dataset(is_train=True, img_transformer=None, resize_size=resize_size, 
+                                    use_foreground=use_foreground)
 
         df = full_train_base.pairs_df
         component_indices = calculate_data_connected_components(df)
