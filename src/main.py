@@ -9,7 +9,7 @@ def main():
     set_seed()
     pipeline = Pipeline()
     pipeline.execute_learner()
-    pipeline.print_best_configs_metrics()
+    pipeline.print_best_learner_metrics()
 
 def set_seed(seed=42):
     # Set seed for Python's built-in random module

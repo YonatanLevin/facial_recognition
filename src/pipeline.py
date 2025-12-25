@@ -244,7 +244,7 @@ class Pipeline():
         plt.savefig(join(self.history_plots_dir, self.learner_name+'.png'))
         plt.close()
 
-    def print_best_lerner_metrics(self):
+    def print_best_learner_metrics(self):
         eval_df = self.history_df.query("phase == 'eval'")
         best_f1_per_learner = eval_df.loc[eval_df.groupby('learner')['f1'].idxmax()]
         print(best_f1_per_learner)
