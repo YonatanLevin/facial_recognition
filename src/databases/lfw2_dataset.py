@@ -163,9 +163,6 @@ class LFW2Dataset(Dataset):
 
     def get_image(self, path: str) -> Tensor:
         """Helper to manage the cache lookup and storage."""
-        if not self.cache_images:
-            return self.load_robust_image(path)
-            
         if path not in self._cache:
             self._cache[path] = self.load_robust_image(path)
             
