@@ -29,7 +29,7 @@ class LFW2Dataset(Dataset):
             add_noise (bool): If True AND use_foreground is True, add Gaussian noise.
         """
         super().__init__()
-        self.data_main_path = 'data'
+        self.data_main_path = find_main_data_path()
         self.is_train = is_train
         self.img_transformer = img_transformer
         self.resize_size = resize_size
@@ -167,3 +167,11 @@ class LFW2Dataset(Dataset):
             self._cache[path] = self.load_robust_image(path)
             
         return self._cache[path].clone()
+    
+def find_main_data_path() -> str:
+    simple_path = 'data'
+    kaggle_path = '/kaggle/input/face-recognition-data/data'
+    for path in (simple_path, kaggle_path):
+        if os.path.isdir(path):
+            return path
+    raise FileNotFoundError()
