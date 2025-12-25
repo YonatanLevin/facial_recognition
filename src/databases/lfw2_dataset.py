@@ -120,7 +120,7 @@ class LFW2Dataset(Dataset):
         noisy_img_np = np.clip(noisy_img_np, 0, 255).astype(np.uint8)
         return Image.fromarray(noisy_img_np, 'RGB')
 
-    def load_robust_image(self, path: str) -> Tensor:
+    def load_robust_image(self, path: str) -> Image:
         """
         Load an image with PIL, handles resizing, random background augmentation, 
         and noise injection if configured for training. Defaults to grayscale tensor.
@@ -129,7 +129,7 @@ class LFW2Dataset(Dataset):
             if self.resize_size is not None:
                 img = img.resize(self.resize_size, Image.Resampling.LANCZOS)
 
-        return to_tensor(img)
+        return img
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor, bool]:
         name1, idx1, name2, idx2 = self.pairs_df.iloc[index]
@@ -152,16 +152,16 @@ class LFW2Dataset(Dataset):
 
         return img1, img2, label
     
-    def apply_basic_augmentations(self, img: Tensor) -> Tensor:
+    def apply_basic_augmentations(self, img: Image) -> Tensor:
         if self.use_foreground and img.mode == 'RGBA':
             rgb_img = self._add_random_background(img)
             rgb_img = self._add_gaussian_noise(rgb_img)
             final_img = rgb_img.convert('L')
         else:
             final_img = img.convert('L')
-        return final_img
+        return to_tensor(final_img)
 
-    def get_image(self, path: str) -> Tensor:
+    def get_image(self, path: str) -> Image:
         """Helper to manage the cache lookup and storage."""
         if path not in self._cache:
             self._cache[path] = self.load_robust_image(path)
