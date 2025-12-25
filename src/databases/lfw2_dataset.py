@@ -33,6 +33,8 @@ class LFW2Dataset(Dataset):
         self.is_train = is_train
         self.img_transformer = img_transformer
         self.resize_size = resize_size
+
+        self._cache = {} # Dictionary to store {path: Tensor}
         
         # Augmentation settings specifically for training with foregrounds
         self.use_foreground = use_foreground and is_train
@@ -123,38 +125,11 @@ class LFW2Dataset(Dataset):
         Load an image with PIL, handles resizing, random background augmentation, 
         and noise injection if configured for training. Defaults to grayscale tensor.
         """
-        try:
-            with Image.open(path) as img:
-                # 1. Resize first (standardize dimensions before processing)
-                if self.resize_size is not None:
-                    img = img.resize(self.resize_size, Image.Resampling.LANCZOS)
+        with Image.open(path) as img:
+            if self.resize_size is not None:
+                img = img.resize(self.resize_size, Image.Resampling.LANCZOS)
 
-                # 2. Apply Foreground Augmentations (Only if training and configured)
-                # We check img.mode == 'RGBA' to ensure it's a foreground image with transparency
-                if self.use_foreground and img.mode == 'RGBA':
-                    
-                    # A. Replace transparent background with random noise
-                    rgb_img = self._add_random_background(img)
-                    
-                    # B. Sdd extra Gaussian noise over the whole image
-                    rgb_img = self._add_gaussian_noise(rgb_img)
-
-                    # C. Convert to grayscale for final output
-                    final_img = rgb_img.convert('L')
-                    
-                else:
-                    # Standard loading for testing or normal training: just convert to grayscale
-                    final_img = img.convert('L')
-
-                # 3. Convert to tensor
-                return to_tensor(final_img)
-                
-        except FileNotFoundError:
-             print(f"Error: Image not found at {path}")
-             # Return a black tensor of correct size as fallback to prevent crash
-             if self.resize_size:
-                 return torch.zeros((1, self.resize_size[1], self.resize_size[0]))
-             raise
+        return to_tensor(img)
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor, bool]:
         name1, idx1, name2, idx2 = self.pairs_df.iloc[index]
@@ -164,8 +139,11 @@ class LFW2Dataset(Dataset):
         img2_path = self.constract_img_path(name2, idx2)
 
         # Load images with potential background/noise augmentation
-        img1 = self.load_robust_image(img1_path)
-        img2 = self.load_robust_image(img2_path)
+        img1 = self.get_image(img1_path)
+        img2 = self.get_image(img2_path)
+
+        img1 = self.apply_basic_augmentations(img1)
+        img2 = self.apply_basic_augmentations(img2)
 
         # Apply standard geometric augmentations (flips, rotations) afterward
         if self.img_transformer:
@@ -173,3 +151,22 @@ class LFW2Dataset(Dataset):
             img2 = self.img_transformer(img2)
 
         return img1, img2, label
+    
+    def apply_basic_augmentations(self, img: Tensor) -> Tensor:
+        if self.use_foreground and img.mode == 'RGBA':
+            rgb_img = self._add_random_background(img)
+            rgb_img = self._add_gaussian_noise(rgb_img)
+            final_img = rgb_img.convert('L')
+        else:
+            final_img = img.convert('L')
+        return final_img
+
+    def get_image(self, path: str) -> Tensor:
+        """Helper to manage the cache lookup and storage."""
+        if not self.cache_images:
+            return self.load_robust_image(path)
+            
+        if path not in self._cache:
+            self._cache[path] = self.load_robust_image(path)
+            
+        return self._cache[path].clone()

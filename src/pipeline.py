@@ -36,6 +36,7 @@ class Pipeline():
 
         self.history_path = 'history.csv'
         self.history_plots_dir = 'history_plots'
+        self.session_history = []
         self.history_df = self.load_history()
 
         self.train_loader, self.val_loader, self.test_loader = None, None, None
@@ -71,7 +72,9 @@ class Pipeline():
             self.learner.finish_epoch()
             self.print_metrics()
 
+        session_df = pd.DataFrame(self.session_history)
         self.history_df = self.history_df[self.history_df['learner'] != self.learner_name]
+        self.history_df = pd.concat([self.history_df, session_df], ignore_index=True)
         self.history_df.to_csv(self.history_path,index=False)
 
     def epoch(self, epoch: int, phase: str):
@@ -112,7 +115,7 @@ class Pipeline():
             'f1': computed_metrics[f'{phase}_f1'].item()
         }
         
-        self.history_df.loc[len(self.history_df)] = epoch_results
+        self.session_history.append(epoch_results)
         print(epoch_results)
 
     def load_history(self):
@@ -133,9 +136,12 @@ class Pipeline():
         
         train_dataset, val_dataset, train_positive_percent = self.split_train_val(resize_size, use_foreground=use_foreground)
 
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
-        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, 
+                                  num_workers=self.num_workers, pin_memory=True)
+        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, 
+                                num_workers=self.num_workers, pin_memory=True)
+        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, 
+                                 num_workers=self.num_workers, pin_memory=True)
 
         return train_loader, val_loader, test_loader, train_positive_percent
     
@@ -278,8 +284,8 @@ def find_device() -> torch.device:
     device_name = 'cpu'
     if torch.cuda.is_available():
         device_name = 'cuda'
-    elif torch.xpu.is_available():
-        device_name = 'xpu'
+    # elif torch.xpu.is_available():
+    #     device_name = 'xpu'
     return torch.device(device_name)
 
 def create_img_transformer() -> ImgTransformer:
