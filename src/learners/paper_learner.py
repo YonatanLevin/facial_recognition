@@ -12,7 +12,7 @@ class PaperLearner(Learner):
         encoder = PaperCNN()
         head = PaperHead(encoder.encoding_dim)
         super().__init__(Model(encoder, head), device)
-        self.loss = torch.nn.BCEWithLogitsLoss()
+        self.loss_fn = torch.nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.SGD(self.model.parameters())
         self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.99)
 
