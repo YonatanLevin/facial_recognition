@@ -17,11 +17,9 @@ class PaperHead(ComparisonHead):
         init.normal_(self.fc.weight, self.linear_weight_mean, self.linear_weight_std)
         init.normal_(self.fc.bias, self.linear_bias_mean, self.linear_bias_std)
 
-    def forward(self, img1, img2, is_probs):
+    def forward(self, img1, img2):
         component_dist = torch.abs(img1 - img2)
         logits = self.fc(component_dist)
-        if is_probs:
-            return torch.sigmoid(logits)
         return logits
     
     def logits_to_probs(self, logits):

@@ -50,7 +50,7 @@ class Pipeline():
         
         self.learner = learner_class(self.device)
         self.img_transformer = create_img_transformer()
-        self.train_loader, self.val_loader, self.test_loader = self.setup_loaders()
+        self.train_loader, self.val_loader, self.test_loader, train_positive_percent = self.setup_loaders()
         
         self.train_metrics, self.val_metrics = self.setup_metrics()
         
@@ -118,7 +118,7 @@ class Pipeline():
             return history_df
         return pd.DataFrame(columns=['learner', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
 
-    def setup_loaders(self) -> tuple[DataLoader, DataLoader, DataLoader]:
+    def setup_loaders(self) -> tuple[DataLoader, DataLoader, DataLoader, float]:
         """
         Create identity-disjoint loaders using Graph Connected Components.
         Splits are performed greedily to reach the target validation ratio.
@@ -128,15 +128,15 @@ class Pipeline():
         use_foreground = self.learner.use_foreground
         test_dataset = LFW2Dataset(is_train=False, resize_size=resize_size, use_foreground=use_foreground)
         
-        train_dataset, val_dataset = self.split_train_val(resize_size, use_foreground=use_foreground)
+        train_dataset, val_dataset, train_positive_percent = self.split_train_val(resize_size, use_foreground=use_foreground)
 
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
         val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
         test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
 
-        return train_loader, val_loader, test_loader
+        return train_loader, val_loader, test_loader, train_positive_percent
     
-    def split_train_val(self, resize_size: tuple[int,int], use_foreground: bool | None) -> tuple[Subset, Subset]:
+    def split_train_val(self, resize_size: tuple[int,int], use_foreground: bool | None) -> tuple[Subset, Subset, float]:
         """
         Load and split the full train dataset to train and val datasets.
         Split connected components based on val_ratio probability.
@@ -172,16 +172,18 @@ class Pipeline():
             subset_df = df.iloc[indices]
             pos = (subset_df['name1'] == subset_df['name2']).sum()
             neg = len(subset_df) - pos
-            print(f"{name} Set: Positive={pos} ({pos/len(subset_df):.3f}%), Negative={neg}, Total={len(subset_df)}")
+            pos_percent = pos/len(subset_df)
+            print(f"{name} Set: Positive={pos} ({pos_percent:.3f}%), Negative={neg}, Total={len(subset_df)}")
+            return pos_percent
 
-        print_stats(train_idx, "Train")
+        train_positive_percent = print_stats(train_idx, "Train")
         print_stats(val_idx, "Validation")
 
         # 6. Create Subsets
         train_dataset = Subset(full_train_base, train_idx)
         val_dataset = Subset(full_val_base, val_idx)
         
-        return train_dataset, val_dataset
+        return train_dataset, val_dataset, train_positive_percent
 
     def setup_metrics(self) -> tuple[MetricCollection, MetricCollection]:
         """
