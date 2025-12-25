@@ -4,8 +4,8 @@ import torch.nn.init as init
 from siamese_encoders.encoder import Encoder
 
 class PaperCNN(Encoder):
-    def __init__(self, hyper_parameters):
-        super().__init__(hyper_parameters)
+    def __init__(self):
+        super().__init__(encoding_dim=4096)
 
         self.conv_weight_mean = 0
         self.conv_weight_std = 10**-2  
@@ -17,7 +17,7 @@ class PaperCNN(Encoder):
         self.linear_weight_std = 2*10**-1 
 
         self.linear_bias_mean = 0.5
-        self.linear_bias_std = 10**-2  
+        self.linear_bias_std = 10**-2
         
         self.network = Sequential(
             Conv2d(in_channels=1, out_channels=64, kernel_size=10),
@@ -37,7 +37,7 @@ class PaperCNN(Encoder):
             AdaptiveMaxPool2d(output_size=(6, 6)),
             
             Flatten(),
-            Linear(in_features=9216, out_features=4096),
+            Linear(in_features=9216, out_features=self.encoding_dim),
             Sigmoid()
         )
 

@@ -7,8 +7,6 @@ import numpy as np
 import networkx as nx
 import torch
 from torch.utils.data import DataLoader, Subset
-from torch.optim import Optimizer, SGD 
-from torch.optim.lr_scheduler import LRScheduler, StepLR
 from torchmetrics import MetricCollection, Accuracy, Precision, Recall, F1Score
 from tqdm import tqdm
 import pandas as pd
@@ -18,11 +16,7 @@ import seaborn as sns
 from databases.lfw2_dataset import LFW2Dataset
 from databases.img_transformer import ImgTransformer
 from databases.affine_transformer import AffineTransformer
-from model import Model
-from comparison_heads.comparison_head import ComparisonHead
-from siamese_encoders.encoder import Encoder
-from siamese_encoders.paper_cnn import PaperCNN
-from comparison_heads.paper_head import PaperHead
+from learners.paper_learner import PaperLearner
 
 class Pipeline():
     def __init__(self):
@@ -34,30 +28,30 @@ class Pipeline():
         self.batch_size = 128
         self.num_workers = 4
 
+        self.learners_dict = {'PaperLearner': PaperLearner}
+        self.learner, self.learner_name = None, None
+
         self.history_path = 'history.csv'
         self.history_plots_dir = 'history_plots'
         self.history_df = self.load_history()
 
-        self.config_dir = 'model_configs'
-        self.config_name, self.config_dict = None, None
         self.train_loader, self.val_loader, self.test_loader = None, None, None
         self.img_transformer = None
-        self.loss_fn, self.optimizer, self.scheduler = None, None, None
 
-    def execute_config(self):
-        self.config_name = self.request_config_name()
-        self.config_dict = self.load_config()
+    def execute_learner(self):
+        """
+        Execute a learner
+        """
+        self.learner_name = self.request_learner_name()
+        learner_class = self.learners_dict.get(self.learner_name)
 
-        if self.config_dict == None:
+        if learner_class == None:
             return
         
+        self.learner = learner_class(self.device)
+        self.img_transformer = create_img_transformer()
         self.train_loader, self.val_loader, self.test_loader = self.setup_loaders()
-        self.img_transformer = create_img_transformer(self.config_dict)
-        self.model = create_model(self.config_dict)
-        self.model.to(self.device)
-        self.loss_fn = torch.nn.BCEWithLogitsLoss()
-        self.optimizer = create_optimizer(self.config_dict, self.model)
-        self.scheduler = create_lr_scheduler(self.config_dict, self.optimizer)
+        
         self.train_metrics, self.val_metrics = self.setup_metrics()
         
         self.train()
@@ -71,15 +65,15 @@ class Pipeline():
             # Validation Phase
             self.epoch(epoch, phase='eval')
             # Step scheduler after the full epoch cycle
-            self.scheduler.step()
+            self.learner.finish_epoch()
             self.print_metrics()
 
-        self.history_df = self.history_df[self.history_df['config'] != self.config_name]
+        self.history_df = self.history_df[self.history_df['learner'] != self.learner_name]
         self.history_df.to_csv(self.history_path,index=False)
 
     def epoch(self, epoch: int, phase: str):
         is_train = phase == 'train'
-        self.model.train() if is_train else self.model.eval()
+        self.learner.set_train(is_train)
         data_loader = self.train_loader if is_train else (self.val_loader if phase == 'eval' else self.test_loader)
         
         # Select the appropriate metric tracker
@@ -93,29 +87,19 @@ class Pipeline():
                 img1, img2 = img1.to(self.device, non_blocking=True), img2.to(self.device, non_blocking=True)
                 label = label.to(self.device, non_blocking=True, dtype=torch.float32).unsqueeze(1)
 
-                prediction_logits = self.model(img1, img2, False)
-                loss = self.loss_fn(prediction_logits, label)
-                
-                if is_train:
-                    self.optimizer.zero_grad()
-                    loss.backward()
-                    self.optimizer.step()
-
-                running_loss += loss
-                
+                probs, loss = self.learner.process_batch(img1, img2, label, is_train)
                 # Update metrics on GPU
-                probs = torch.sigmoid(prediction_logits)
+                running_loss += loss
                 current_metrics.update(probs, label)
 
         # Compute final metrics for the epoch
-        # This keeps the bulk of calculations on the GPU [cite: 126]
         computed_metrics = current_metrics.compute()
         
         avg_loss = running_loss.item() / len(data_loader)
         
         # Prepare metrics for history_df (move to CPU only at the very end)
         epoch_results = {
-            'config': self.config_name,
+            'learner': self.learner_name,
             'phase': phase,
             'epoch': epoch,
             'loss': avg_loss,
@@ -128,22 +112,11 @@ class Pipeline():
         self.history_df.loc[len(self.history_df)] = epoch_results
         print(epoch_results)
 
-    def optimize_model(self, model: Model):
-        pass
-
-    def load_config(self) -> dict[str, int] | None:
-        config_file_path = join(self.config_dir, self.config_name + '.json')
-        if isfile(config_file_path):
-            with open(config_file_path, 'r') as f:
-                config_json = f.read()
-            return json.loads(config_json)
-        return None
-
     def load_history(self):
         if isfile(self.history_path):
             history_df = pd.read_csv(self.history_path, index_col=None)
             return history_df
-        return pd.DataFrame(columns=['config', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
+        return pd.DataFrame(columns=['learner', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
 
     def setup_loaders(self) -> tuple[DataLoader, DataLoader, DataLoader]:
         """
@@ -151,8 +124,8 @@ class Pipeline():
         Splits are performed greedily to reach the target validation ratio.
         """
         # 1. Initialize original datasets
-        resize_size = self.config_dict.get('resize_size')
-        use_foreground = self.config_dict.get('use_foreground')
+        resize_size = self.learner.resize_size
+        use_foreground = self.learner.use_foreground
         test_dataset = LFW2Dataset(is_train=False, resize_size=resize_size, use_foreground=use_foreground)
         
         train_dataset, val_dataset = self.split_train_val(resize_size, use_foreground=use_foreground)
@@ -229,11 +202,11 @@ class Pipeline():
         return self.train_metrics, self.val_metrics
 
     def print_metrics(self):
-        config_history_df = self.history_df[self.history_df['config'] == self.config_name]\
+        learner_history_df = self.history_df[self.history_df['learner'] == self.learner_name]\
                                            .sort_values(by='epoch', ascending=True)
-        config_history_df = config_history_df[config_history_df['phase'] != 'test']
+        learner_history_df = learner_history_df[learner_history_df['phase'] != 'test']
         metrics_cols = ['precision', 'accuracy', 'recall', 'f1']
-        long_df = config_history_df.melt(
+        long_df = learner_history_df.melt(
             id_vars=['epoch', 'phase'], 
             value_vars=metrics_cols, 
             var_name='metric', 
@@ -254,34 +227,26 @@ class Pipeline():
 
         # Refine the legend
         axes[0].legend(title='Metrics & Phase', loc='lower left')
-        axes[0].set_title('Model Performance Metrics')
+        axes[0].set_title('Performance Metrics')
         axes[0].set_ylabel('Score')
 
         axes[0].set_ylim(bottom=0, top=1)
 
-        sns.lineplot(data=config_history_df, x='epoch', y='loss', hue='phase', ax=axes[1])
+        sns.lineplot(data=learner_history_df, x='epoch', y='loss', hue='phase', ax=axes[1])
         axes[1].set_ylim(bottom=0)
 
         makedirs(self.history_plots_dir, exist_ok=True)
-        plt.savefig(join(self.history_plots_dir, self.config_name+'.png'))
+        plt.savefig(join(self.history_plots_dir, self.learner_name+'.png'))
         plt.close()
 
-    def print_best_configs_metrics(self):
+    def print_best_lerner_metrics(self):
         eval_df = self.history_df.query("phase == 'eval'")
-        best_f1_per_conf = eval_df.loc[eval_df.groupby('config')['f1'].idxmax()]
-        print(best_f1_per_conf)
+        best_f1_per_learner = eval_df.loc[eval_df.groupby('learner')['f1'].idxmax()]
+        print(best_f1_per_learner)
 
-    def request_config_name(self) -> str:
-        configs = listdir(self.config_dir)
-        extentionless_configs = [config.split('.')[0] for config in configs]
-        print('configs: ', extentionless_configs)
-        return input('config name:')
-
-
-def create_model(config_dict: dict[str, Any]) -> Model:
-    encoder = create_encoder(config_dict)
-    head = create_head(config_dict)
-    return Model(encoder, head).float()
+    def request_learner_name(self) -> str:
+        print('Learners: ', list(self.learners_dict.keys()))
+        return input('Learner name:')
         
 def find_device() -> torch.device:
     """
@@ -296,46 +261,8 @@ def find_device() -> torch.device:
     elif torch.xpu.is_available():
         device_name = 'xpu'
     return torch.device(device_name)
-    
-def create_encoder(config_dict: dict[str, Any]) -> Encoder:
-    """
-    Create an encoder from the config_dict
-    
-    :param config_dict: The configuration dict
-    :type config_dict: dict[str, Any]
-    :return: Created encoder from config_dict
-    :rtype: Encoder
-    """
-    encoder_name = config_dict['encoder_name']
-    match encoder_name:
-        case 'PaperCNN':
-            return PaperCNN(config_dict)
-        case _:
-            raise ValueError(f'Unknown encoder: {encoder_name}')
-        
-def create_head(config_dict: dict[str, Any]) -> ComparisonHead:
-    """
-    Create a comparison head from the config dict
-    
-    :param config_dict: Config dict
-    :type config_dict: dict[str, Any]
-    :return: Comparison head from config_dict
-    :rtype: ComparisonHead
-    """
-    head_name = config_dict['head_name']
-    match config_dict['head_name']:
-        case 'PaperHead':
-            return PaperHead(config_dict)
-        case _:
-            raise ValueError(f'Unknown head: {head_name}')
 
-def create_optimizer(config_dict: dict[str, Any], model: Model) -> Optimizer:
-    return SGD(model.parameters(), weight_decay = 0.01, momentum=0.5)
-
-def create_lr_scheduler(config_dict: dict[str, Any], optimizer: Optimizer) -> LRScheduler:
-    return StepLR(optimizer, step_size=1, gamma=0.99) # Example: decay LR by gamma every step_size epochs
-
-def create_img_transformer(config_dict: dict[str, Any]) -> ImgTransformer:
+def create_img_transformer() -> ImgTransformer:
     return AffineTransformer()
 
 def calculate_data_connected_components(df: pd.DataFrame) -> list[list[int]]:

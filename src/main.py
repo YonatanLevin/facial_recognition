@@ -8,7 +8,7 @@ from pipeline import Pipeline
 def main():
     set_seed()
     pipeline = Pipeline()
-    pipeline.execute_config()
+    pipeline.execute_learner()
     pipeline.print_best_configs_metrics()
 
 def set_seed(seed=42):

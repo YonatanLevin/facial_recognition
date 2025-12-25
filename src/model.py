@@ -10,8 +10,11 @@ class Model(Module):
         self.encoder = encoder
         self.head = head
 
-    def forward(self, img1: Tensor, img2: Tensor, is_probs: bool):
-        img1_encoding = self.encoder(img1)
-        img2_encoding = self.encoder(img2)
-        y = self.head(img1_encoding, img2_encoding, is_probs)
-        return y
+    def forward(self, img1: Tensor, img2: Tensor) -> tuple[Tensor, Tensor, Tensor]:
+        encoding1 = self.encoder(img1)
+        encoding2 = self.encoder(img2)
+        y = self.head(encoding1, encoding2)
+        return encoding1, encoding2, y
+    
+    def logits_to_probs(self, logits: Tensor):
+        return self.head.logits_to_probs(logits)

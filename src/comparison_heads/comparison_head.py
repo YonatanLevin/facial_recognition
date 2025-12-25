@@ -5,11 +5,11 @@ from torch import Tensor
 from torch.nn import Module
 
 class ComparisonHead(Module, ABC):
-    def __init__(self, hyper_parameters: dict[str, Any]):
+    def __init__(self, encoding_dim):
         super().__init__()
-        self.hyper_parameters = hyper_parameters
+        self.encoding_dim = encoding_dim
 
-    def forward(self, img1: Tensor, img2: Tensor, is_probs: bool) -> Tensor:
+    def forward(self, img1: Tensor, img2: Tensor) -> Tensor:
         """
         Calculate similarity score given two img embeddings
         
@@ -17,9 +17,10 @@ class ComparisonHead(Module, ABC):
         :type img1: Tensor
         :param img2: The embedding of the second image
         :type img2: Tensor
-        :param img2: Whether to compute probabilities or logits
-        :type img2: bool
-        :return: Logits / similarity score
+        :return: Logits
         :rtype: Tensor
         """
+        pass
+
+    def logits_to_probs(self, logits: Tensor):
         pass
