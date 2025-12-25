@@ -17,6 +17,8 @@ from databases.lfw2_dataset import LFW2Dataset
 from databases.img_transformer import ImgTransformer
 from databases.affine_transformer import AffineTransformer
 from learners.paper_learner1 import PaperLearner1
+from learners.paper_learner2 import PaperLearner2
+from learners.paper_learner3 import PaperLearner3
 
 class Pipeline():
     def __init__(self):
@@ -28,7 +30,8 @@ class Pipeline():
         self.batch_size = 128
         self.num_workers = 4
 
-        self.learners_dict = {'PaperLearner': PaperLearner1}
+        self.learners_dict = {'PaperLearner1': PaperLearner1, 'PaperLearner2': PaperLearner2, 
+                              'PaperLearner3': PaperLearner3}
         self.learner, self.learner_name = None, None
 
         self.history_path = 'history.csv'
@@ -247,8 +250,23 @@ class Pipeline():
         print(best_f1_per_learner)
 
     def request_learner_name(self) -> str:
-        print('Learners: ', list(self.learners_dict.keys()))
-        return input('Learner name:')
+        # Convert keys to a list to ensure a consistent order
+        names = list(self.learners_dict.keys())
+        
+        # Print names with their corresponding index
+        print("Learners:")
+        for index, name in enumerate(names):
+            print(f"{index}: {name}")
+        
+        try:
+            # Request the index from the user
+            choice = int(input('Enter learner index: '))
+            
+            # Return the name matching the index
+            return names[choice]
+        except (ValueError, IndexError):
+            print("Invalid selection. Please enter a valid numerical index.")
+            return self.request_learner_name()  # Optional: recursive call to retry
         
 def find_device() -> torch.device:
     """
