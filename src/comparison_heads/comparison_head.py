@@ -5,7 +5,7 @@ from torch import Tensor
 from torch.nn import Module
 
 class ComparisonHead(Module, ABC):
-    def __init__(self, encoding_dim):
+    def __init__(self, encoding_dim: int):
         super().__init__()
         self.encoding_dim = encoding_dim
 

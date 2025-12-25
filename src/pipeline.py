@@ -16,6 +16,7 @@ import seaborn as sns
 from databases.lfw2_dataset import LFW2Dataset
 from databases.img_transformer import ImgTransformer
 from databases.affine_transformer import AffineTransformer
+from learners.cnn_cosine_learner1 import CNNCosineLearner1
 from learners.paper_learner1 import PaperLearner1
 from learners.paper_learner2 import PaperLearner2
 from learners.paper_learner3 import PaperLearner3
@@ -31,7 +32,7 @@ class Pipeline():
         self.num_workers = 4
 
         self.learners_dict = {'PaperLearner1': PaperLearner1, 'PaperLearner2': PaperLearner2, 
-                              'PaperLearner3': PaperLearner3}
+                              'PaperLearner3': PaperLearner3, 'CNNCosineLearner1': CNNCosineLearner1}
         self.learner, self.learner_name = None, None
 
         self.history_path = 'history.csv'
@@ -213,8 +214,8 @@ class Pipeline():
         return self.train_metrics, self.val_metrics
 
     def print_metrics(self):
-        learner_history_df = self.history_df[self.history_df['learner'] == self.learner_name]\
-                                           .sort_values(by='epoch', ascending=True)
+        session_df = pd.DataFrame(self.session_history)
+        learner_history_df = session_df.sort_values(by='epoch', ascending=True)
         learner_history_df = learner_history_df[learner_history_df['phase'] != 'test']
         metrics_cols = ['precision', 'accuracy', 'recall', 'f1']
         long_df = learner_history_df.melt(
