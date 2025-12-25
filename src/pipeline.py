@@ -16,7 +16,7 @@ import seaborn as sns
 from databases.lfw2_dataset import LFW2Dataset
 from databases.img_transformer import ImgTransformer
 from databases.affine_transformer import AffineTransformer
-from learners.paper_learner import PaperLearner
+from learners.paper_learner1 import PaperLearner1
 
 class Pipeline():
     def __init__(self):
@@ -28,7 +28,7 @@ class Pipeline():
         self.batch_size = 128
         self.num_workers = 4
 
-        self.learners_dict = {'PaperLearner': PaperLearner}
+        self.learners_dict = {'PaperLearner': PaperLearner1}
         self.learner, self.learner_name = None, None
 
         self.history_path = 'history.csv'

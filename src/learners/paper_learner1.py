@@ -7,11 +7,13 @@ from siamese_encoders.paper_cnn import PaperCNN
 from comparison_heads.paper_head import PaperHead
 
 
-class PaperLearner(Learner):
-    def __init__(self, device):
+class PaperLearner1(Learner):
+    def __init__(self, device, resize_size: tuple[int, int] | None = None, 
+                 use_foreground: bool=False):
         encoder = PaperCNN()
         head = PaperHead(encoder.encoding_dim)
-        super().__init__(Model(encoder, head), device)
+        super().__init__(Model(encoder, head), device, resize_size=resize_size, 
+                         use_foreground=use_foreground)
         self.loss_fn = torch.nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.SGD(self.model.parameters())
         self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.99)
