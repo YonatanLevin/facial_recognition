@@ -166,7 +166,7 @@ class LFW2Dataset(Dataset):
         if path not in self._cache:
             self._cache[path] = self.load_robust_image(path)
             
-        return self._cache[path].clone()
+        return self._cache[path]
     
 def find_main_data_path() -> str:
     simple_path = 'data'
