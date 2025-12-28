@@ -103,8 +103,7 @@ class LFW2Dataset(Dataset):
                 
                 img = img.resize(self.resize_size, Image.Resampling.LANCZOS)
                 
-
-        return to_tensor(img)
+        return img
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor, bool]:
         name1, idx1, name2, idx2 = self.pairs_df.iloc[index]
@@ -116,6 +115,9 @@ class LFW2Dataset(Dataset):
         # Load images with potential background/noise augmentation
         img1 = self.get_image(img1_path)
         img2 = self.get_image(img2_path)
+
+        img1 = to_tensor(img1)
+        img2 = to_tensor(img2)
 
         # Apply standard geometric augmentations (flips, rotations) afterward
         if self.img_transformer:
