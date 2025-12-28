@@ -10,10 +10,11 @@ from my_package.siamese_encoders.conv_next import ConvNeXt
 class ConvNeXtLearner2(Learner):
     def __init__(self, device, resize_size: tuple[int, int] | None = (105,105), 
                  use_foreground: bool=False):
-        encoder = ConvNeXt()
+        encoder = ConvNeXt(encoding_dim=512)
         head = PaperHead(encoder.encoding_dim)
         super().__init__(Model(encoder, head), device, resize_size=resize_size, 
                          use_foreground=use_foreground)
+        
         self.loss_fn = torch.nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.SGD(self.model.parameters())
         self.scheduler = CosineAnnealingWarmRestarts(self.optimizer, T_0=5)

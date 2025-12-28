@@ -15,6 +15,8 @@ class Learner(ABC):
         self.use_foreground = use_foreground
 
         self.model.to(self.device)
+
+        print('model parameters number: ', sum(p.numel() for p in self.model.parameters()))
         
     def process_batch(self, img1: Tensor, img2: Tensor, label: Tensor, is_train: bool) -> tuple[Tensor, Tensor]:
         """
