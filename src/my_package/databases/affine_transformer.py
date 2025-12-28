@@ -1,7 +1,8 @@
 import torch
 import random
 import torchvision.transforms.v2.functional as F
-from databases.img_transformer import ImgTransformer
+
+from my_package.databases.img_transformer import ImgTransformer
 
 class AffineTransformer(ImgTransformer):
     def __init__(self):

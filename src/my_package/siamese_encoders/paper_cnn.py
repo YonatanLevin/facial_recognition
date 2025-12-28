@@ -1,7 +1,7 @@
 from torch.nn import Sequential, ReLU, MaxPool2d, AdaptiveMaxPool2d, Conv2d, Linear, Sigmoid, Flatten, Module
 import torch.nn.init as init
 
-from siamese_encoders.encoder import Encoder
+from my_package.siamese_encoders.encoder import Encoder
 
 class PaperCNN(Encoder):
     def __init__(self):

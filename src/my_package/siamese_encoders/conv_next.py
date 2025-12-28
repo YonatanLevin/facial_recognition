@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from typing import List
 
-from siamese_encoders.encoder import Encoder
+from my_package.siamese_encoders.encoder import Encoder
 
 class LayerNorm(nn.Module):
     """

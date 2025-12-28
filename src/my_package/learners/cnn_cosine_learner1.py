@@ -1,10 +1,10 @@
 
 import torch
 
-from comparison_heads.cosine_head import CosineHead
-from learners.learner import Learner
-from model import Model
-from siamese_encoders.paper_cnn import PaperCNN
+from my_package.comparison_heads.cosine_head import CosineHead
+from my_package.learners.learner import Learner
+from my_package.model import Model
+from my_package.siamese_encoders.paper_cnn import PaperCNN
 
 
 class CNNCosineLearner1(Learner):

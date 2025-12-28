@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "my_package"
+version = "0.1.0"
+description = "A professional ML project structure"
+dependencies = [
+    "torch",
+    "numpy",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

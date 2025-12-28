@@ -2,8 +2,8 @@ import torch
 from torch.nn import Module
 from torch import Tensor
 
-from siamese_encoders.encoder import Encoder
-from comparison_heads.comparison_head import ComparisonHead
+from my_package.siamese_encoders.encoder import Encoder
+from my_package.comparison_heads.comparison_head import ComparisonHead
 
 class Model(Module):
     def __init__(self, encoder: Encoder, head: ComparisonHead):

@@ -4,7 +4,7 @@ import seaborn
 import pandas as pd
 import numpy as np
 
-from databases.lfw2_dataset import LFW2Dataset
+from my_package.databases.lfw2_dataset import LFW2Dataset
 from matplotlib import pyplot as plt
 
 

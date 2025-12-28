@@ -1,7 +1,7 @@
 from torch.nn import Linear
 import torch.nn.functional as F
 
-from comparison_heads.comparison_head import ComparisonHead
+from my_package.comparison_heads.comparison_head import ComparisonHead
 
 
 class CosineHead(ComparisonHead):

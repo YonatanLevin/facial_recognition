@@ -2,7 +2,6 @@ from abc import ABC
 
 from torch import Tensor
 from torch.nn import Module
-from typing import Any
 
 
 class Encoder(Module, ABC):

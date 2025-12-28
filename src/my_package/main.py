@@ -3,7 +3,7 @@ import random
 import numpy as np
 import torch
 
-from pipeline import Pipeline
+from my_package.pipeline import Pipeline
 
 def main():
     set_seed()

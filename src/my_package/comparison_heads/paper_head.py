@@ -1,7 +1,7 @@
 import torch
 import torch.nn.init as init
 
-from comparison_heads.comparison_head import ComparisonHead
+from my_package.comparison_heads.comparison_head import ComparisonHead
 
 class PaperHead(ComparisonHead):
     def __init__(self, encoding_dim):

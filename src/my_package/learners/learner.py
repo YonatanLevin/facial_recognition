@@ -3,7 +3,7 @@ from abc import ABC
 import torch
 from torch import Tensor
 
-from model import Model
+from my_package.model import Model
 
 class Learner(ABC):
     def __init__(self, model: Model, device: torch.device, resize_size: int | None = None, 
