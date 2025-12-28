@@ -4,7 +4,7 @@ import torch.nn.init as init
 from my_package.siamese_encoders.encoder import Encoder
 
 class PaperCNN(Encoder):
-    def __init__(self, final_activation: str = 'Sigmoid'):
+    def __init__(self, final_activation: str| None = 'Sigmoid'):
         super().__init__(encoding_dim=4096)
 
         self.conv_weight_mean = 0
@@ -46,7 +46,7 @@ class PaperCNN(Encoder):
             case 'Tanh':
                 self.network.append(Tanh())
             case _:
-                raise ValueError('Unrecognized activation name')
+                pass
         self.weights_init()
 
     def weights_init(self):
