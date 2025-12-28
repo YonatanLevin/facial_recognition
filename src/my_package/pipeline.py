@@ -19,9 +19,11 @@ from my_package.learners.cnn_cosine_learner1 import CNNCosineLearner1
 from my_package.learners.cnn_cosine_learner2 import CNNCosineLearner2
 from my_package.learners.cnn_cosine_learner3 import CNNCosineLearner3
 from my_package.learners.conv_next_learner2 import ConvNeXtLearner2
+from my_package.learners.learner import Learner
 from my_package.learners.paper_learner1 import PaperLearner1
 from my_package.learners.paper_learner2 import PaperLearner2
 from my_package.learners.paper_learner3 import PaperLearner3
+from my_package.learners.paper_learner4 import PaperLearner4
 from my_package.learners.conv_next_learner1 import ConvNeXtLearner1
 
 class Pipeline():
@@ -35,10 +37,12 @@ class Pipeline():
         self.num_workers = 4
 
         self.learners_dict = {'PaperLearner1': PaperLearner1, 'PaperLearner2': PaperLearner2, 
-                              'PaperLearner3': PaperLearner3, 'CNNCosineLearner1': CNNCosineLearner1,
-                              'CNNCosineLearner2': CNNCosineLearner2, 'CNNCosineLearner3': CNNCosineLearner3,
+                              'PaperLearner3': PaperLearner3, 'PaperLearner4': PaperLearner4, 
+                              'CNNCosineLearner1': CNNCosineLearner1, 'CNNCosineLearner2': CNNCosineLearner2, 
+                              'CNNCosineLearner3': CNNCosineLearner3,
                               'ConvNeXtLearner1': ConvNeXtLearner1, 'ConvNeXtLearner2': ConvNeXtLearner2}
-        self.learner, self.learner_name = None, None
+        self.learner: Learner = None 
+        self.learner_name = None
 
         self.history_path = HISTORY_PATH
         self.history_plots_dir = HISTORY_PLOTS_DIR
@@ -61,6 +65,7 @@ class Pipeline():
         self.learner = learner_class(self.device)
         self.img_transformer = create_img_transformer()
         self.train_loader, self.val_loader, self.test_loader, train_positive_percent = self.setup_loaders()
+        self.learner.setup_loss(train_positive_percent)
         
         self.train_metrics, self.val_metrics = self.setup_metrics()
         

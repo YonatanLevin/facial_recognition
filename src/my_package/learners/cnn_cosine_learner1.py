@@ -15,7 +15,6 @@ class CNNCosineLearner1(Learner):
                          use_foreground=use_foreground)
         self.cosine_loss_margin = 0.5
         self.embeding_loss = torch.nn.CosineEmbeddingLoss(self.cosine_loss_margin)
-        self.head_loss = torch.nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
         
     def process_batch(self, img1, img2, label, is_train):
@@ -44,3 +43,8 @@ class CNNCosineLearner1(Learner):
 
     def finish_epoch(self):
         pass
+
+    def setup_loss(self, train_positive_percent):
+        pos_weight_val = (1 - train_positive_percent) / train_positive_percent    
+        pos_weight_tensor = torch.tensor([pos_weight_val])
+        self.head_loss = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)

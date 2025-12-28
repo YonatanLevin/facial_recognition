@@ -14,7 +14,6 @@ class ConvNeXtLearner1(Learner):
         head = PaperHead(encoder.encoding_dim)
         super().__init__(Model(encoder, head), device, resize_size=resize_size, 
                          use_foreground=use_foreground)
-        self.loss_fn = torch.nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.SGD(self.model.parameters())
         # self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.99)
 
@@ -32,3 +31,8 @@ class ConvNeXtLearner1(Learner):
 
     # def finish_epoch(self):
     #     self.scheduler.step()
+
+    def setup_loss(self, train_positive_percent):
+        pos_weight_val = (1 - train_positive_percent) / train_positive_percent    
+        pos_weight_tensor = torch.tensor([pos_weight_val])
+        self.loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)

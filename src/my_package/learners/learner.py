@@ -42,3 +42,6 @@ class Learner(ABC):
 
     def set_train(self, mode: bool):
         self.model.train(mode)
+
+    def setup_loss(self, train_positive_percent: float):
+        pass

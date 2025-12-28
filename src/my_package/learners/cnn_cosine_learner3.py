@@ -16,7 +16,7 @@ class CNNCosineLearner3(Learner):
                          use_foreground=use_foreground)
         self.cosine_loss_margin = 0.5
         self.embeding_loss = torch.nn.CosineEmbeddingLoss(self.cosine_loss_margin)
-        self.head_loss = torch.nn.BCEWithLogitsLoss()
+        
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
         self.scheduler = CosineAnnealingWarmRestarts(self.optimizer, T_0=5)
         
@@ -46,3 +46,8 @@ class CNNCosineLearner3(Learner):
 
     def finish_epoch(self):
         self.scheduler.step()
+
+    def setup_loss(self, train_positive_percent):
+        pos_weight_val = (1 - train_positive_percent) / train_positive_percent    
+        pos_weight_tensor = torch.tensor([pos_weight_val])
+        self.head_loss = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
