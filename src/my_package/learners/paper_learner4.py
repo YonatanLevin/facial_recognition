@@ -60,8 +60,6 @@ class PaperLearner4(Learner):
             param_group['momentum'] = new_momentum
 
     def setup_loss(self, train_positive_percent):
-        # The paper uses standard cross-entropy; weighting is optional 
-        # but helpful for imbalance[cite: 118, 168].
         pos_weight_val = (1 - train_positive_percent) / train_positive_percent    
-        pos_weight_tensor = torch.tensor([pos_weight_val]).to(self.device)
+        pos_weight_tensor = torch.tensor([pos_weight_val]).to(self.device) # Correctly moved
         self.loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
