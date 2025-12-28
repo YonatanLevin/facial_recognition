@@ -6,26 +6,11 @@ from typing import List
 
 from my_package.siamese_encoders.encoder import Encoder
 
-# Helper for Stochastic Depth (Standard in modern CNNs/ViTs)
-def drop_path(x, drop_prob: float = 0., training: bool = False):
-    if drop_prob == 0. or not training:
-        return x
-    keep_prob = 1 - drop_prob
-    shape = (x.shape[0],) + (1,) * (x.ndim - 1)
-    random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
-    random_tensor.floor_()  # binarize
-    output = x.div(keep_prob) * random_tensor
-    return output
-
-class DropPath(nn.Module):
-    def __init__(self, drop_prob=None):
-        super(DropPath, self).__init__()
-        self.drop_prob = drop_prob
-
-    def forward(self, x):
-        return drop_path(x, self.drop_prob, self.training)
-
 class LayerNorm(nn.Module):
+    """
+    Standard LayerNorm that supports 'channels_first' (B, C, H, W) 
+    by temporarily permuting to 'channels_last' (B, H, W, C).
+    """
     def __init__(self, normalized_shape: int, eps=1e-6):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(normalized_shape))
@@ -34,56 +19,54 @@ class LayerNorm(nn.Module):
         self.normalized_shape = (normalized_shape,)
 
     def forward(self, x: Tensor) -> Tensor:
+        # Move C to the end: [B, C, H, W] -> [B, H, W, C]
         x = x.permute(0, 2, 3, 1)
         x = F.layer_norm(x, self.normalized_shape, self.weight, self.bias, self.eps)
+        # Move C back: [B, H, W, C] -> [B, C, H, W]
         x = x.permute(0, 3, 1, 2)
         return x
 
 class ConvNeXtBlock(nn.Module):
-    def __init__(self, dim: int, drop_path: float = 0., expansion_ratio: float = 2.0):
+    def __init__(self, dim: int):
         super().__init__()
-        # 1. Depthwise Convolution (Reduced to 5x5 or kept at 7x7)
-        self.dwconv = nn.Conv2d(dim, dim, kernel_size=7, padding=3, groups=dim)
+        # 1. Depthwise Convolution (7x7)
+        self.dwconv = nn.Conv2d(dim, dim, kernel_size=5, padding=2, groups=dim)
         
-        # 2. LayerNorm
+        # 2. LayerNorm (Channel-wise)
         self.norm = nn.LayerNorm(dim, eps=1e-6)
         
-        # 3. Inverted Bottleneck with lower expansion ratio
-        hidden_dim = int(dim * expansion_ratio)
-        self.pwconv1 = nn.Linear(dim, hidden_dim) 
+        # 3. Pointwise / Inverted Bottleneck (Linear layers are faster than 1x1 convs)
+        self.pwconv1 = nn.Linear(dim, 4 * dim) 
         self.act = nn.GELU()
-        self.pwconv2 = nn.Linear(hidden_dim, dim)
-        
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.pwconv2 = nn.Linear(4 * dim, dim)
 
     def forward(self, x: Tensor) -> Tensor:
         shortcut = x
         x = self.dwconv(x)
-        x = x.permute(0, 2, 3, 1) # Channels-Last
+        
+        # Permute for LayerNorm and Linear Layers (Channels-Last)
+        x = x.permute(0, 2, 3, 1) 
         x = self.norm(x)
         x = self.pwconv1(x)
         x = self.act(x)
         x = self.pwconv2(x)
-        x = x.permute(0, 3, 1, 2) # Channels-First
         
-        return shortcut + self.drop_path(x)
+        # Return to Channels-First
+        x = x.permute(0, 3, 1, 2)
+        
+        return shortcut + x
 
 class ConvNeXt(Encoder):
     def __init__(
         self, 
-        encoding_dim: int = 512, # Standard for Face Verification
-        dims: List[int] = [64, 128, 256, 512], # Reduced width
-        depths: List[int] = [2, 2, 6, 2], # Reduced depth
-        drop_path_rate: float = 0.1,
-        expansion_ratio: float = 2.0
+        encoding_dim: int = 384, 
+        dims=[48, 96, 192, 384], 
+        depths: List[int] = [2, 2, 6, 2]
     ):
-        # Pass 512 to the abstract Encoder class
         super().__init__(encoding_dim=encoding_dim)
         
-        # Stochastic depth decay rule
-        dp_rates = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))] 
-
-        # 1. Stem
+        # 1. Stem: Patchify (105x105 -> 26x26)
+        # Changed input channels to 1 for grayscale
         self.downsample_layers = nn.ModuleList()
         stem = nn.Sequential(
             nn.Conv2d(1, dims[0], kernel_size=4, stride=4),
@@ -91,7 +74,7 @@ class ConvNeXt(Encoder):
         )
         self.downsample_layers.append(stem)
 
-        # 2. Downsampling layers
+        # 2. Downsampling layers between stages
         for i in range(3):
             downsample = nn.Sequential(
                 LayerNorm(dims[i], eps=1e-6),
@@ -99,37 +82,29 @@ class ConvNeXt(Encoder):
             )
             self.downsample_layers.append(downsample)
 
-        # 3. Stages
+        # 3. Feature extraction stages
         self.stages = nn.ModuleList()
-        cur = 0
         for i in range(4):
             stage = nn.Sequential(
-                *[ConvNeXtBlock(
-                    dim=dims[i], 
-                    drop_path=dp_rates[cur + j], 
-                    expansion_ratio=expansion_ratio
-                ) for j in range(depths[i])]
+                *[ConvNeXtBlock(dim=dims[i]) for _ in range(depths[i])]
             )
             self.stages.append(stage)
-            cur += depths[i]
 
-        # 4. Optimized Face Head
+        # 4. Final Projection Head
         self.final_norm = nn.LayerNorm(dims[-1], eps=1e-6)
-        self.dropout = nn.Dropout(p=0.3)
         self.embedding_proj = nn.Linear(dims[-1], encoding_dim)
 
     def forward(self, x: Tensor) -> Tensor:
+        # Pass through downsampling and ConvNeXt stages
         for i in range(4):
             x = self.downsample_layers[i](x)
             x = self.stages[i](x)
 
+        # Global Average Pooling (B, C, H, W) -> (B, C)
         x = F.adaptive_avg_pool2d(x, (1, 1)).flatten(1)
         
+        # Final Norm and Projection to 4096
         x = self.final_norm(x)
-        x = self.dropout(x)
         embedding = self.embedding_proj(x)
-        
-        # Crucial for Cosine Similarity matching
-        embedding = F.normalize(embedding, p=2, dim=1)
         
         return embedding
