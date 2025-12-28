@@ -1,10 +1,10 @@
-from torch.nn import Sequential, ReLU, MaxPool2d, AdaptiveMaxPool2d, Conv2d, Linear, Sigmoid, Flatten, Module
+from torch.nn import Sequential, ReLU, MaxPool2d, AdaptiveMaxPool2d, Conv2d, Linear, Sigmoid, Tanh, Flatten, Module
 import torch.nn.init as init
 
 from my_package.siamese_encoders.encoder import Encoder
 
 class PaperCNN(Encoder):
-    def __init__(self):
+    def __init__(self, final_activation: str = 'Sigmoid'):
         super().__init__(encoding_dim=4096)
 
         self.conv_weight_mean = 0
@@ -18,6 +18,7 @@ class PaperCNN(Encoder):
 
         self.linear_bias_mean = 0.5
         self.linear_bias_std = 10**-2
+
         
         self.network = Sequential(
             Conv2d(in_channels=1, out_channels=64, kernel_size=10),
@@ -38,9 +39,14 @@ class PaperCNN(Encoder):
             
             Flatten(),
             Linear(in_features=9216, out_features=self.encoding_dim),
-            Sigmoid()
         )
-
+        match final_activation:
+            case 'Sigmoid':
+                self.network.append(Sigmoid())
+            case 'Tanh':
+                self.network.append(Tanh())
+            case _:
+                raise ValueError('Unrecognized activation name')
         self.weights_init()
 
     def weights_init(self):

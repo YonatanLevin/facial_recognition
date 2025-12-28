@@ -16,6 +16,7 @@ from my_package.databases.lfw2_dataset import LFW2Dataset
 from my_package.databases.img_transformer import ImgTransformer
 from my_package.databases.affine_transformer import AffineTransformer
 from my_package.learners.cnn_cosine_learner1 import CNNCosineLearner1
+from my_package.learners.cnn_cosine_learner2 import CNNCosineLearner2
 from my_package.learners.conv_next_learner2 import ConvNeXtLearner2
 from my_package.learners.paper_learner1 import PaperLearner1
 from my_package.learners.paper_learner2 import PaperLearner2
@@ -34,6 +35,7 @@ class Pipeline():
 
         self.learners_dict = {'PaperLearner1': PaperLearner1, 'PaperLearner2': PaperLearner2, 
                               'PaperLearner3': PaperLearner3, 'CNNCosineLearner1': CNNCosineLearner1,
+                              'CNNCosineLearner2': CNNCosineLearner2,
                               'ConvNeXtLearner1': ConvNeXtLearner1, 'ConvNeXtLearner2': ConvNeXtLearner2}
         self.learner, self.learner_name = None, None
 
