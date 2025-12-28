@@ -17,6 +17,7 @@ class CNNCosineLearner3(Learner):
         self.embeding_loss = torch.nn.CosineEmbeddingLoss(self.cosine_loss_margin)
         self.head_loss = torch.nn.BCEWithLogitsLoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
+        self.scheduler = torch.nn.CosineAnnealingWarmRestarts(self.optimizer, T_0=5)
         
     def process_batch(self, img1, img2, label, is_train):
         encoding1, encoding2 = self.model.encode(img1, img2)
@@ -43,4 +44,4 @@ class CNNCosineLearner3(Learner):
         return probs, total_loss
 
     def finish_epoch(self):
-        pass
+        self.scheduler.step()
