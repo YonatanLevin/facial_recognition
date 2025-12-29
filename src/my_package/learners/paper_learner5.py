@@ -36,7 +36,7 @@ class PaperLearner5(Learner):
         encoding1, encoding2 = self.model.encode(img1, img2)
         encoding1, encoding2 = encoding1/2, encoding2/2
 
-        logits = self.model.head(img1, img2)
+        logits = self.model.head(encoding1, encoding2)
         probs = self.model.logits_to_probs(logits)
         loss = self.loss_fn(logits, label)
 
