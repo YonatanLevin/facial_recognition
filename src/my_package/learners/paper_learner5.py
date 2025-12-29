@@ -1,4 +1,4 @@
-from my_package.learners.paper_learner1 import PaperLearner4
+from my_package.learners.paper_learner4 import PaperLearner4
 
 class PaperLearner5(PaperLearner4):
     def __init__(self, device):
