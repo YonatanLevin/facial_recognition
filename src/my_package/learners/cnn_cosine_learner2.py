@@ -10,4 +10,4 @@ from my_package.siamese_encoders.paper_cnn import PaperCNN
 
 class CNNCosineLearner2(CNNCosineLearner1):
     def __init__(self, device, use_foreground: bool=False):
-        super().__init__(device, use_foreground, encoder_final_activation='Tanh')
+        super().__init__(device, use_foreground, encoder_final_activation=torch.nn.Tanh)

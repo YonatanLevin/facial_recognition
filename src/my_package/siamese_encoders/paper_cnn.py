@@ -1,10 +1,10 @@
-from torch.nn import Sequential, ReLU, MaxPool2d, AdaptiveMaxPool2d, Conv2d, Linear, Sigmoid, Tanh, Flatten, Module
+from torch.nn import Sequential, MaxPool2d, AdaptiveMaxPool2d, Conv2d, Linear, Sigmoid, Flatten, Module
 import torch.nn.init as init
 
 from my_package.siamese_encoders.encoder import Encoder
 
 class PaperCNN(Encoder):
-    def __init__(self, final_activation: str| None = 'Sigmoid'):
+    def __init__(self, final_activation_class: Module | None = Sigmoid, conv_activation_class = Sigmoid):
         super().__init__(encoding_dim=4096)
 
         self.conv_weight_mean = 0
@@ -22,33 +22,26 @@ class PaperCNN(Encoder):
         
         self.network = Sequential(
             Conv2d(in_channels=1, out_channels=64, kernel_size=10),
-            ReLU(),
+            conv_activation_class(),
             MaxPool2d(kernel_size=2, stride=2),
             
             Conv2d(in_channels=64, out_channels=128, kernel_size=7),
-            ReLU(),
+            conv_activation_class(),
             MaxPool2d(kernel_size=2, stride=2),
             
             Conv2d(in_channels=128, out_channels=128, kernel_size=4),
-            ReLU(),
+            conv_activation_class(),
             MaxPool2d(kernel_size=2, stride=2),
             
             Conv2d(in_channels=128, out_channels=256, kernel_size=4),
-            ReLU(),
+            conv_activation_class(),
             AdaptiveMaxPool2d(output_size=(6, 6)),
             
             Flatten(),
-            Linear(in_features=9216, out_features=self.encoding_dim),
+            Linear(in_features=9216, out_features=self.encoding_dim)
         )
-        match final_activation:
-            case 'Sigmoid':
-                self.network.append(Sigmoid())
-            case 'Tanh':
-                self.network.append(Tanh())
-            case 'ReLU':
-                self.network.append(ReLU())
-            case _:
-                pass
+        if final_activation_class:
+            self.network.append(final_activation_class())
         self.weights_init()
 
     def weights_init(self):

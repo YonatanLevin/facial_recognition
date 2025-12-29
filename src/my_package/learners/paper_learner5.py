@@ -6,7 +6,7 @@ from my_package.comparison_heads.paper_head import PaperHead
 
 class PaperLearner5(Learner):
     def __init__(self, device, resize_size: tuple[int, int] | None = (105, 105), 
-                 use_foreground: bool=False, encoder_final_activation = 'Tanh'):
+                 use_foreground: bool=False, encoder_final_activation = torch.nn.Tanh):
         encoder = PaperCNN(final_activation=encoder_final_activation)
         head = PaperHead(encoder.encoding_dim)
         super().__init__(Model(encoder, head), device, resize_size=resize_size, 

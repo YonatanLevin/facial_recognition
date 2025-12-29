@@ -27,6 +27,7 @@ from my_package.learners.paper_learner4 import PaperLearner4
 from my_package.learners.conv_next_learner1 import ConvNeXtLearner1
 from my_package.learners.paper_learner5 import PaperLearner5
 from my_package.learners.paper_learner6 import PaperLearner6
+from my_package.learners.paper_learner7 import PaperLearner7
 
 class Pipeline():
     def __init__(self):
@@ -41,6 +42,7 @@ class Pipeline():
         self.learners_dict = {'PaperLearner1': PaperLearner1, 'PaperLearner2': PaperLearner2, 
                               'PaperLearner3': PaperLearner3, 'PaperLearner4': PaperLearner4,
                               'PaperLearner5': PaperLearner5, 'PaperLearner6': PaperLearner6,
+                              'PaperLearner7': PaperLearner7,
                               'CNNCosineLearner1': CNNCosineLearner1, 'CNNCosineLearner2': CNNCosineLearner2, 
                               'CNNCosineLearner3': CNNCosineLearner3,
                               'ConvNeXtLearner1': ConvNeXtLearner1, 'ConvNeXtLearner2': ConvNeXtLearner2}
