@@ -45,6 +45,8 @@ class PaperCNN(Encoder):
                 self.network.append(Sigmoid())
             case 'Tanh':
                 self.network.append(Tanh())
+            case 'ReLU':
+                self.network.append(ReLU())
             case _:
                 pass
         self.weights_init()
