@@ -21,6 +21,7 @@ from my_package.learners.cnn_cosine_learner3 import CNNCosineLearner3
 from my_package.learners.conv_next_learner2 import ConvNeXtLearner2
 from my_package.learners.learner import Learner
 from my_package.learners.paper_learner1 import PaperLearner1
+from my_package.learners.paper_learner10 import PaperLearner10
 from my_package.learners.paper_learner2 import PaperLearner2
 from my_package.learners.paper_learner3 import PaperLearner3
 from my_package.learners.paper_learner4 import PaperLearner4
@@ -45,7 +46,7 @@ class Pipeline():
                               'PaperLearner3': PaperLearner3, 'PaperLearner4': PaperLearner4,
                               'PaperLearner5': PaperLearner5, 'PaperLearner6': PaperLearner6,
                               'PaperLearner7': PaperLearner7, 'PaperLearner8': PaperLearner8,
-                              'PaperLearner9': PaperLearner9,
+                              'PaperLearner9': PaperLearner9, 'PaperLearner10': PaperLearner10,
                               'CNNCosineLearner1': CNNCosineLearner1, 'CNNCosineLearner2': CNNCosineLearner2, 
                               'CNNCosineLearner3': CNNCosineLearner3,
                               'ConvNeXtLearner1': ConvNeXtLearner1, 'ConvNeXtLearner2': ConvNeXtLearner2}

@@ -1,11 +1,12 @@
-from torch.nn import Sequential, MaxPool2d, AdaptiveMaxPool2d, Conv2d, Linear, Sigmoid, Flatten, Module
+from torch.nn import Sequential, MaxPool2d, AdaptiveMaxPool2d, Conv2d, Linear, Sigmoid, \
+                     Flatten, Module, BatchNorm1d
 import torch.nn.init as init
 
 from my_package.siamese_encoders.encoder import Encoder
 
 class PaperCNN(Encoder):
     def __init__(self, final_activation_class: Module | None = Sigmoid, conv_activation_class = Sigmoid,
-                 linear_bias_mean = 0.5):
+                 linear_bias_mean = 0.5, linear_batch_norm = False):
         super().__init__(encoding_dim=4096)
 
         self.conv_weight_mean = 0
@@ -41,6 +42,8 @@ class PaperCNN(Encoder):
             Flatten(),
             Linear(in_features=9216, out_features=self.encoding_dim)
         )
+        if linear_batch_norm:
+            self.network.append(BatchNorm1d(self.encoding_dim))
         if final_activation_class:
             self.network.append(final_activation_class())
         self.weights_init()
