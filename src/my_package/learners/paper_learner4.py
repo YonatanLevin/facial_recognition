@@ -5,7 +5,7 @@ from my_package.siamese_encoders.paper_cnn import PaperCNN
 from my_package.comparison_heads.paper_head import PaperHead
 
 class PaperLearner4(Learner):
-    def __init__(self, device, resize_size: tuple[int, int] | None = None, 
+    def __init__(self, device, resize_size: tuple[int, int] | None = (105, 105), 
                  use_foreground: bool=False):
         encoder = PaperCNN()
         head = PaperHead(encoder.encoding_dim)
