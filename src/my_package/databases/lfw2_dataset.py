@@ -46,6 +46,9 @@ class LFW2Dataset(Dataset):
              # Safety check: ensure foreground directory exists
             if not os.path.exists(self.imgs_main_path):
                  raise FileNotFoundError(f"Foreground directory not found: {self.imgs_main_path}. Please run background removal first.")
+        elif resize_size[0] == 105 and resize_size[1] == 105:
+            self.imgs_main_path = join(self.data_main_path, 'resized')
+            self.img_extension = '.jpg'
         else:
             self.imgs_main_path = join(self.data_main_path, 'lfw2')
             self.img_extension = '.jpg'
@@ -99,7 +102,7 @@ class LFW2Dataset(Dataset):
         """
         with Image.open(path) as img:
             img = img.convert('L')
-            if self.resize_size is not None:
+            if self.resize_size is not None and not (self.resize_size[0] == 105 and self.resize_size[1] == 105):
                 
                 img = img.resize(self.resize_size, Image.Resampling.LANCZOS)
                 
