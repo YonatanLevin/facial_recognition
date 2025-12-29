@@ -10,7 +10,7 @@ from my_package.siamese_encoders.paper_cnn import PaperCNN
 
 class CNNCosineLearner3(Learner):
     def __init__(self, device, use_foreground: bool=False, encoder_final_activation = None):
-        encoder = PaperCNN(final_activation=encoder_final_activation)
+        encoder = PaperCNN(final_activation_class=encoder_final_activation)
         head = CosineHead(encoder.encoding_dim)
         super().__init__(Model(encoder, head), device, resize_size=(105, 105), 
                          use_foreground=use_foreground)

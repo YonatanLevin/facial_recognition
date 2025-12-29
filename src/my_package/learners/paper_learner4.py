@@ -1,3 +1,4 @@
+import torch
 from torch.nn import Sigmoid
 from my_package.model import Model
 from my_package.learners.learner import Learner
@@ -8,7 +9,7 @@ class PaperLearner4(Learner):
     def __init__(self, device, resize_size: tuple[int, int] | None = (105, 105), 
                  use_foreground: bool=False, encoder_final_activation = Sigmoid,
                  encoder_conv_activation = Sigmoid):
-        encoder = PaperCNN(final_activation=encoder_final_activation, 
+        encoder = PaperCNN(final_activation_class=encoder_final_activation, 
                            conv_activation_class=encoder_conv_activation)
         head = PaperHead(encoder.encoding_dim)
         super().__init__(Model(encoder, head), device, resize_size=resize_size, 
