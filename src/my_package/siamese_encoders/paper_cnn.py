@@ -4,7 +4,8 @@ import torch.nn.init as init
 from my_package.siamese_encoders.encoder import Encoder
 
 class PaperCNN(Encoder):
-    def __init__(self, final_activation_class: Module | None = Sigmoid, conv_activation_class = Sigmoid):
+    def __init__(self, final_activation_class: Module | None = Sigmoid, conv_activation_class = Sigmoid,
+                 linear_bias_mean = 0.5):
         super().__init__(encoding_dim=4096)
 
         self.conv_weight_mean = 0
@@ -16,7 +17,7 @@ class PaperCNN(Encoder):
         self.linear_weight_mean = 0
         self.linear_weight_std = 2*10**-1 
 
-        self.linear_bias_mean = 0.5
+        self.linear_bias_mean = linear_bias_mean
         self.linear_bias_std = 10**-2
 
         
