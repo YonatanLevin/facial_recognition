@@ -22,6 +22,7 @@ from my_package.learners.conv_next_learner2 import ConvNeXtLearner2
 from my_package.learners.learner import Learner
 from my_package.learners.paper_learner1 import PaperLearner1
 from my_package.learners.paper_learner10 import PaperLearner10
+from my_package.learners.paper_learner11 import PaperLearner11
 from my_package.learners.paper_learner2 import PaperLearner2
 from my_package.learners.paper_learner3 import PaperLearner3
 from my_package.learners.paper_learner4 import PaperLearner4
@@ -47,6 +48,7 @@ class Pipeline():
                               'PaperLearner5': PaperLearner5, 'PaperLearner6': PaperLearner6,
                               'PaperLearner7': PaperLearner7, 'PaperLearner8': PaperLearner8,
                               'PaperLearner9': PaperLearner9, 'PaperLearner10': PaperLearner10,
+                              'PaperLearner11': PaperLearner11,
                               'CNNCosineLearner1': CNNCosineLearner1, 'CNNCosineLearner2': CNNCosineLearner2, 
                               'CNNCosineLearner3': CNNCosineLearner3,
                               'ConvNeXtLearner1': ConvNeXtLearner1, 'ConvNeXtLearner2': ConvNeXtLearner2}
@@ -273,7 +275,7 @@ class Pipeline():
 
     def print_best_learner_metrics(self):
         eval_df = self.history_df.query("phase == 'eval'")
-        best_f1_per_learner = eval_df.loc[eval_df.groupby('learner')['f1'].idxmax()]
+        best_f1_per_learner = eval_df.loc[eval_df.groupby('learner')['accuracy'].idxmax()]
         print(best_f1_per_learner)
 
     def request_learner_name(self) -> str:
