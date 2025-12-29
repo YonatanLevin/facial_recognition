@@ -9,14 +9,14 @@ class PaperLearner4(Learner):
     def __init__(self, device, resize_size: tuple[int, int] | None = (105, 105), 
                  use_foreground: bool=False, encoder_final_activation = Sigmoid,
                  encoder_conv_activation = Sigmoid, encoder_linear_batch_norm = False,
-                 encoder_conv_batch_norm = False):
+                 encoder_conv_batch_norm = False, normalize_imgs=False):
         encoder = PaperCNN(final_activation_class=encoder_final_activation, 
                            conv_activation_class=encoder_conv_activation,
                            linear_batch_norm=encoder_linear_batch_norm,
                            conv_batch_norm=encoder_conv_batch_norm)
         head = PaperHead(encoder.encoding_dim)
         super().__init__(Model(encoder, head), device, resize_size=resize_size, 
-                         use_foreground=use_foreground)
+                         use_foreground=use_foreground, normalize_imgs=normalize_imgs)
         
         # 1. Layer-wise Hyperparameters (from Bayesian Optimization / Paper specs)
         # The paper suggests these ranges: eta [1e-4, 1e-1], mu [0, 1], lambda [0, 0.1]

@@ -23,6 +23,7 @@ from my_package.learners.learner import Learner
 from my_package.learners.paper_learner1 import PaperLearner1
 from my_package.learners.paper_learner10 import PaperLearner10
 from my_package.learners.paper_learner11 import PaperLearner11
+from my_package.learners.paper_learner12 import PaperLearner12
 from my_package.learners.paper_learner2 import PaperLearner2
 from my_package.learners.paper_learner3 import PaperLearner3
 from my_package.learners.paper_learner4 import PaperLearner4
@@ -48,7 +49,7 @@ class Pipeline():
                               'PaperLearner5': PaperLearner5, 'PaperLearner6': PaperLearner6,
                               'PaperLearner7': PaperLearner7, 'PaperLearner8': PaperLearner8,
                               'PaperLearner9': PaperLearner9, 'PaperLearner10': PaperLearner10,
-                              'PaperLearner11': PaperLearner11,
+                              'PaperLearner11': PaperLearner11, 'PaperLearner12': PaperLearner12,
                               'CNNCosineLearner1': CNNCosineLearner1, 'CNNCosineLearner2': CNNCosineLearner2, 
                               'CNNCosineLearner3': CNNCosineLearner3,
                               'ConvNeXtLearner1': ConvNeXtLearner1, 'ConvNeXtLearner2': ConvNeXtLearner2}
@@ -148,25 +149,39 @@ class Pipeline():
         return pd.DataFrame(columns=['learner', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
 
     def setup_loaders(self) -> tuple[DataLoader, DataLoader, DataLoader, float]:
-        """
-        Create identity-disjoint loaders using Graph Connected Components.
-        Splits are performed greedily to reach the target validation ratio.
-        """
-        # 1. Initialize original datasets
         resize_size = self.learner.resize_size
         use_foreground = self.learner.use_foreground
-        test_dataset = LFW2Dataset(is_train=False, resize_size=resize_size, use_foreground=use_foreground)
-        
-        train_dataset, val_dataset, train_positive_percent = self.split_train_val(resize_size, use_foreground=use_foreground)
 
-        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True, 
+        # 1. Initialize Test Dataset
+        test_dataset = LFW2Dataset(is_train=False, resize_size=resize_size, 
+                                   use_foreground=use_foreground)
+        
+        # 2. Split Train and Val
+        train_subset, val_subset, train_pos_pct = self.split_train_val(resize_size, use_foreground)
+
+        # 3. Handle Normalization logic
+        if self.learner.normalize_imgs:
+            print("Computing per-pixel normalization stats from training set...")
+            # Access the underlying LFW2Dataset from the Subset wrapper
+            base_train_ds: LFW2Dataset = train_subset.dataset
+            # Calculate stats ONLY using the training indices
+            train_mean, train_std = base_train_ds.calc_images_mean_std(train_subset.indices)
+            
+            # Inject these stats into all datasets
+            base_train_ds.set_normalization_stats(train_mean, train_std) # affects train
+            val_subset.dataset.set_normalization_stats(train_mean, train_std) # affects val
+            test_dataset.set_normalization_stats(train_mean, train_std) # affects test
+            print("Normalization stats applied to all loaders.")
+
+        # 4. Create Loaders
+        train_loader = DataLoader(train_subset, batch_size=self.batch_size, shuffle=True, 
                                   num_workers=self.num_workers, pin_memory=True)
-        val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False, 
+        val_loader = DataLoader(val_subset, batch_size=self.batch_size, shuffle=False, 
                                 num_workers=self.num_workers, pin_memory=True)
         test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, 
                                  num_workers=self.num_workers, pin_memory=True)
 
-        return train_loader, val_loader, test_loader, train_positive_percent
+        return train_loader, val_loader, test_loader, train_pos_pct
     
     def split_train_val(self, resize_size: tuple[int,int], use_foreground: bool | None) -> tuple[Subset, Subset, float]:
         """

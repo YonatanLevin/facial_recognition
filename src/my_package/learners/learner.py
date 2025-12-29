@@ -7,12 +7,13 @@ from my_package.model import Model
 
 class Learner(ABC):
     def __init__(self, model: Model, device: torch.device, resize_size: int | None = None, 
-                 use_foreground: bool = False):
+                 use_foreground: bool = False, normalize_imgs: bool = False):
         super().__init__()
         self.model = model
         self.device = device
         self.resize_size = resize_size
         self.use_foreground = use_foreground
+        self.normalize_imgs = normalize_imgs
 
         self.model.to(self.device)
 

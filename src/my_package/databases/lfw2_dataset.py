@@ -3,11 +3,13 @@ from typing import Optional
 import os
 
 import pandas as pd
+import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import to_tensor
 from PIL import Image
-import numpy as np
+from tqdm import tqdm
+
 
 from my_package.constants import DATA_DIR
 from my_package.databases.img_transformer import ImgTransformer
@@ -34,26 +36,31 @@ class LFW2Dataset(Dataset):
         self.img_transformer = img_transformer
         self.resize_size = resize_size
 
+        self.img_mean: Optional[Tensor] = None
+        self.img_std: Optional[Tensor] = None
+
         self._cache = {} # Dictionary to store {path: Tensor}
         
         # Augmentation settings specifically for training with foregrounds
         self.use_foreground = use_foreground and is_train
+        
 
+        self.find_imgs_path_extension()
+            
+        self.pairs_df = self.parse_pairs()
+
+
+    def find_imgs_path_extension(self) -> tuple[str, str]:
         # Determine correct path and extension based on augmentation setting
         if self.use_foreground:
             self.imgs_main_path = join(self.data_main_path, 'foreground')
             self.img_extension = '.png' # Foregrounds hold alpha channel
-             # Safety check: ensure foreground directory exists
-            if not os.path.exists(self.imgs_main_path):
-                 raise FileNotFoundError(f"Foreground directory not found: {self.imgs_main_path}. Please run background removal first.")
-        elif resize_size[0] == 105 and resize_size[1] == 105:
+        elif self.resize_size[0] == 105 and self.resize_size[1] == 105:
             self.imgs_main_path = join(self.data_main_path, 'resized')
             self.img_extension = '.jpg'
         else:
             self.imgs_main_path = join(self.data_main_path, 'lfw2')
             self.img_extension = '.jpg'
-            
-        self.pairs_df = self.parse_pairs()
         
     def parse_pairs(self) -> pd.DataFrame:
         """
@@ -122,6 +129,10 @@ class LFW2Dataset(Dataset):
         img1 = to_tensor(img1)
         img2 = to_tensor(img2)
 
+        if self.img_mean is not None:
+            img1 = (img1 - self.img_mean) / self.img_std
+            img2 = (img2 - self.img_mean) / self.img_std
+
         # Apply standard geometric augmentations (flips, rotations) afterward
         if self.img_transformer:
             img1 = self.img_transformer(img1)
@@ -135,4 +146,35 @@ class LFW2Dataset(Dataset):
             self._cache[path] = self.load_robust_image(path)
             
         return self._cache[path]
+    
+    def calc_images_mean_std(self, indices: list[int] | None = None) -> tuple[Tensor, Tensor]:
+        """
+        Calculates mean and std. 
+        If indices are provided, only uses those samples (important for train/val split).
+        """
+        # Determine which rows to process
+        subset_df = self.pairs_df.iloc[indices] if indices is not None else self.pairs_df
+        
+        unique_paths = set()
+        for _, row in subset_df.iterrows():
+            unique_paths.add(self.constract_img_path(row['name1'], row['idx1']))
+            unique_paths.add(self.constract_img_path(row['name2'], row['idx2']))
+
+        if not unique_paths:
+            return torch.zeros(1), torch.ones(1)
+
+        all_images = []
+        for path in tqdm(unique_paths, desc="Calculating Mean/Std"):
+            img = self.get_image(path)
+            all_images.append(to_tensor(img))
+
+        stacked = torch.stack(all_images, dim=0) # [N, 1, H, W]
+        mean = torch.mean(stacked, dim=0)
+        std = torch.std(stacked, dim=0) + 1e-6 # Add epsilon to avoid div by zero
+        return mean, std
+    
+    def set_normalization_stats(self, mean: Tensor, std: Tensor):
+        """Method to inject mean and std calculated from training data."""
+        self.img_mean = mean
+        self.img_std = std
     
