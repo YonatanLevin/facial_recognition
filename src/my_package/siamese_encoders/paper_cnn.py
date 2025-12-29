@@ -44,8 +44,8 @@ class PaperCNN(Encoder):
             AdaptiveMaxPool2d(output_size=(6, 6)),
             
             Flatten(),
-            BatchNorm1d(self.encoding_dim) if linear_batch_norm else Identity(),
             Linear(in_features=9216, out_features=self.encoding_dim),
+            BatchNorm1d(self.encoding_dim) if linear_batch_norm else Identity(),
             final_activation_class() if final_activation_class else Identity()
         )
 
