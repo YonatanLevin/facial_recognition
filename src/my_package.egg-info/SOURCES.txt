@@ -5,6 +5,7 @@ src/my_package/main.py
 src/my_package/model.py
 src/my_package/pipeline.py
 src/my_package/remove_background.py
+src/my_package/resize_images.py
 src/my_package.egg-info/PKG-INFO
 src/my_package.egg-info/SOURCES.txt
 src/my_package.egg-info/dependency_links.txt
@@ -17,11 +18,18 @@ src/my_package/databases/affine_transformer.py
 src/my_package/databases/img_transformer.py
 src/my_package/databases/lfw2_dataset.py
 src/my_package/learners/cnn_cosine_learner1.py
+src/my_package/learners/cnn_cosine_learner2.py
+src/my_package/learners/cnn_cosine_learner3.py
 src/my_package/learners/conv_next_learner1.py
+src/my_package/learners/conv_next_learner2.py
 src/my_package/learners/learner.py
 src/my_package/learners/paper_learner1.py
 src/my_package/learners/paper_learner2.py
 src/my_package/learners/paper_learner3.py
+src/my_package/learners/paper_learner4.py
+src/my_package/learners/paper_learner5.py
+src/my_package/learners/paper_learner6.py
+src/my_package/learners/paper_learner7.py
 src/my_package/siamese_encoders/conv_next.py
 src/my_package/siamese_encoders/encoder.py
 src/my_package/siamese_encoders/paper_cnn.py
