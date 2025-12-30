@@ -92,6 +92,8 @@ class Pipeline():
         
         self.train()
 
+        self.learner.load_model(self.model_path)
+
         self.epoch(0, 'test')
 
     def train(self):

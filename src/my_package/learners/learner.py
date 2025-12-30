@@ -47,3 +47,7 @@ class Learner(ABC):
 
     def setup_loss(self, train_positive_percent: float):
         pass
+
+    def load_model(self, model_path: str):
+        state_dict = torch.load(model_path, weights_only=True)
+        self.model.load_state_dict(state_dict)
