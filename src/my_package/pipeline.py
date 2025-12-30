@@ -11,7 +11,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
 
-from my_package.constants import HISTORY_PATH, HISTORY_PLOTS_DIR
+from my_package.constants import BASE_DIR, HISTORY_PATH, HISTORY_PLOTS_DIR
 from my_package.databases.lfw2_dataset import LFW2Dataset
 from my_package.databases.img_transformer import ImgTransformer
 from my_package.databases.affine_transformer import AffineTransformer
@@ -42,7 +42,7 @@ class Pipeline():
         self.device = find_device()
         print('device: ', self.device)
 
-        self.max_epochs = 60
+        self.max_epochs = 100
         self.val_ratio=0.2
         self.batch_size = 128
         self.num_workers = 4
@@ -65,6 +65,9 @@ class Pipeline():
         self.history_plots_dir = HISTORY_PLOTS_DIR
         self.session_history = []
         self.history_df = self.load_history()
+
+        self.model_path = BASE_DIR / 'model_weights.pth'
+        self.best_val_f1 = float('inf')
 
         self.train_loader, self.val_loader, self.test_loader = None, None, None
         self.img_transformer = None
@@ -89,7 +92,7 @@ class Pipeline():
         
         self.train()
 
-        # self.epoch(0, 'test')
+        self.epoch(0, 'test')
 
     def train(self):
         for epoch in range(self.max_epochs):
@@ -143,6 +146,9 @@ class Pipeline():
             'recall': computed_metrics[f'{phase}_recall'].item(),
             'f1': computed_metrics[f'{phase}_f1'].item()
         }
+        if phase == 'eval' and epoch_results['f1'] > self.best_val_f1:
+            self.best_val_f1 = epoch_results['f1']
+            torch.save(self.learner.model.state_dict(), self.model_path)
         
         self.session_history.append(epoch_results)
         print(epoch_results)
