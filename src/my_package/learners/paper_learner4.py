@@ -9,7 +9,8 @@ class PaperLearner4(Learner):
     def __init__(self, device, resize_size: tuple[int, int] | None = (105, 105), 
                  use_foreground: bool=False, encoder_final_activation = Sigmoid,
                  encoder_conv_activation = Sigmoid, encoder_linear_batch_norm = False,
-                 encoder_conv_batch_norm = False, normalize_imgs=False):
+                 encoder_conv_batch_norm = False, normalize_imgs=False,
+                 weight_decay = 1e-2):
         encoder = PaperCNN(final_activation_class=encoder_final_activation, 
                            conv_activation_class=encoder_conv_activation,
                            linear_batch_norm=encoder_linear_batch_norm,
@@ -23,7 +24,6 @@ class PaperLearner4(Learner):
         # In a real scenario, these would be individual values per layer.
         self.lr_init = 1e-2 
         self.mu_final = 0.9  # Final individual momentum term mu_j
-        self.weight_decay = 1e-2 # Layer-wise L2 regularization lambda_j
         
         # 2. Setup Optimizer with Layer-wise parameters
         # For simplicity here, we apply the same logic to all layers as the paper
@@ -32,7 +32,7 @@ class PaperLearner4(Learner):
             self.model.parameters(), 
             lr=self.lr_init, 
             momentum=0.5, # Initial momentum fixed to 0.5
-            weight_decay=self.weight_decay
+            weight_decay=weight_decay
         )
         
         self.current_epoch = 0
