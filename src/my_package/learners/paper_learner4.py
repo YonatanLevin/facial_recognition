@@ -10,7 +10,7 @@ class PaperLearner4(Learner):
                  use_foreground: bool=False, encoder_final_activation = Sigmoid,
                  encoder_conv_activation = Sigmoid, encoder_linear_batch_norm = False,
                  encoder_conv_batch_norm = False, normalize_imgs=False,
-                 weight_decay = 1e-2):
+                 weight_decay = 1e-2, l1_lambda = 0):
         encoder = PaperCNN(final_activation_class=encoder_final_activation, 
                            conv_activation_class=encoder_conv_activation,
                            linear_batch_norm=encoder_linear_batch_norm,
@@ -24,6 +24,7 @@ class PaperLearner4(Learner):
         # In a real scenario, these would be individual values per layer.
         self.lr_init = 1e-2 
         self.mu_final = 0.9  # Final individual momentum term mu_j
+        self.l1_lambda = l1_lambda
         
         # 2. Setup Optimizer with Layer-wise parameters
         # For simplicity here, we apply the same logic to all layers as the paper
@@ -41,7 +42,13 @@ class PaperLearner4(Learner):
         # The paper uses Binary Cross-Entropy (Regularized) [cite: 168, 169]
         encoding1, encoding2, logits = self.model(img1, img2)
         probs = self.model.logits_to_probs(logits)
-        loss = self.loss_fn(logits, label)
+        base_loss = self.loss_fn(logits, label)
+
+        l1_reg = torch.tensor(0., device=self.device)
+        for param in self.model.parameters():
+            l1_reg += torch.norm(param, 1)
+        
+        loss = base_loss + (self.l1_lambda * l1_reg)
 
         if is_train:
             self.optimizer.zero_grad()

@@ -26,6 +26,7 @@ from my_package.learners.paper_learner11 import PaperLearner11
 from my_package.learners.paper_learner12 import PaperLearner12
 from my_package.learners.paper_learner13 import PaperLearner13
 from my_package.learners.paper_learner14 import PaperLearner14
+from my_package.learners.paper_learner15 import PaperLearner15
 from my_package.learners.paper_learner2 import PaperLearner2
 from my_package.learners.paper_learner3 import PaperLearner3
 from my_package.learners.paper_learner4 import PaperLearner4
@@ -53,6 +54,7 @@ class Pipeline():
                               'PaperLearner9': PaperLearner9, 'PaperLearner10': PaperLearner10,
                               'PaperLearner11': PaperLearner11, 'PaperLearner12': PaperLearner12,
                               'PaperLearner13': PaperLearner13, 'PaperLearner14': PaperLearner14,
+                              'PaperLearner15': PaperLearner15,
                               'CNNCosineLearner1': CNNCosineLearner1, 'CNNCosineLearner2': CNNCosineLearner2, 
                               'CNNCosineLearner3': CNNCosineLearner3,
                               'ConvNeXtLearner1': ConvNeXtLearner1, 'ConvNeXtLearner2': ConvNeXtLearner2}
