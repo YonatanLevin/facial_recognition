@@ -67,7 +67,8 @@ class Pipeline():
         self.history_df = self.load_history()
 
         self.model_path = BASE_DIR / 'model_weights.pth'
-        self.best_val_f1 = float('inf')
+        self.best_val_f1 = -1
+        self.best_epoch = -1
 
         self.train_loader, self.val_loader, self.test_loader = None, None, None
         self.img_transformer = None
@@ -91,9 +92,8 @@ class Pipeline():
         self.train_metrics, self.val_metrics = self.setup_metrics()
         
         self.train()
-
+        print(f'best epoch: {self.best_epoch}, best val f1: {self.best_val_f1:.4f}')
         self.learner.load_model(self.model_path)
-
         self.epoch(0, 'test')
 
     def train(self):
@@ -150,6 +150,7 @@ class Pipeline():
         }
         if phase == 'eval' and epoch_results['f1'] > self.best_val_f1:
             self.best_val_f1 = epoch_results['f1']
+            self.best_epoch = epoch
             torch.save(self.learner.model.state_dict(), self.model_path)
         
         self.session_history.append(epoch_results)
