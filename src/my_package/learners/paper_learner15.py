@@ -9,4 +9,4 @@ class PaperLearner15(PaperLearner4):
                          encoder_linear_batch_norm=True,
                          encoder_conv_batch_norm=True,
                          normalize_imgs=True,
-                         l1_lambda=1e-3)
+                         l1_lambda=1e-7)

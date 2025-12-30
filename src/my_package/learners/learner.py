@@ -14,10 +14,11 @@ class Learner(ABC):
         self.resize_size = resize_size
         self.use_foreground = use_foreground
         self.normalize_imgs = normalize_imgs
+        self.n_model_parameters = sum(p.numel() for p in self.model.parameters())
 
         self.model.to(self.device)
 
-        print('model parameters number: ', sum(p.numel() for p in self.model.parameters()))
+        print('model parameters number: ', self.n_model_parameters)
         
     def process_batch(self, img1: Tensor, img2: Tensor, label: Tensor, is_train: bool) -> tuple[Tensor, Tensor]:
         """
