@@ -89,7 +89,7 @@ class Pipeline():
         self.train_loader, self.val_loader, self.test_loader, train_positive_percent = self.setup_loaders()
         self.learner.setup_loss(train_positive_percent)
         
-        self.train_metrics, self.val_metrics = self.setup_metrics()
+        self.train_metrics, self.val_metrics, self.test_metrics = self.setup_metrics()
         
         self.train()
         print(f'best epoch: {self.best_epoch}, best val f1: {self.best_val_f1:.4f}')
@@ -117,7 +117,7 @@ class Pipeline():
         data_loader = self.train_loader if is_train else (self.val_loader if phase == 'eval' else self.test_loader)
         
         # Select the appropriate metric tracker
-        current_metrics = self.train_metrics if is_train else self.val_metrics
+        current_metrics = self.train_metrics if is_train else (self.val_metrics if phase == 'eval' else self.test_metrics)
         current_metrics.reset()
 
         running_loss = torch.tensor(0.0).to(self.device)
@@ -246,12 +246,12 @@ class Pipeline():
         
         return train_dataset, val_dataset, train_positive_percent
 
-    def setup_metrics(self) -> tuple[MetricCollection, MetricCollection]:
+    def setup_metrics(self) -> tuple[MetricCollection, MetricCollection, MetricCollection]:
         """
         Setup train and val metrics
         
         :return: Metric collections
-        :rtype: tuple[MetricCollection, MetricCollection]
+        :rtype: tuple[MetricCollection, MetricCollection, MetricCollection]
         """
         metrics = MetricCollection({
             'accuracy': Accuracy(task='binary'),
@@ -259,10 +259,11 @@ class Pipeline():
             'recall': Recall(task='binary'),
             'f1': F1Score(task='binary')
         })
-        self.train_metrics = metrics.clone(prefix='train_').to(self.device)
-        self.val_metrics = metrics.clone(prefix='eval_').to(self.device)
+        train_metrics = metrics.clone(prefix='train_').to(self.device)
+        val_metrics = metrics.clone(prefix='eval_').to(self.device)
+        test_metrics = metrics.clone(prefix='test_').to(self.device)
 
-        return self.train_metrics, self.val_metrics
+        return train_metrics, val_metrics, test_metrics
 
     def print_metrics(self):
         session_df = pd.DataFrame(self.session_history)
