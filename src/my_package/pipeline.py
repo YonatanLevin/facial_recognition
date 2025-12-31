@@ -86,7 +86,9 @@ class Pipeline():
         self.learner = learner_class(self.device)
         print('Model: ', self.learner.model)
         self.img_transformer = create_img_transformer()
-        self.train_loader, self.val_loader, self.test_loader, train_positive_percent = self.setup_loaders()
+        self.train_loader, self.val_loader, self.test_loader, train_positive_percent = \
+            setup_loaders(self.learner.resize_size, self.learner.use_foreground, self.batch_size, 
+                          self.learner.normalize_imgs, self.num_workers, self.img_transformer, self.val_ratio)
         self.learner.setup_loss(train_positive_percent)
         
         self.train_metrics, self.val_metrics, self.test_metrics = self.setup_metrics()
@@ -161,90 +163,6 @@ class Pipeline():
             history_df = pd.read_csv(self.history_path, index_col=None)
             return history_df
         return pd.DataFrame(columns=['learner', 'phase', 'epoch', 'loss', 'accuracy', 'precision', 'recall', 'f1'])
-
-    def setup_loaders(self) -> tuple[DataLoader, DataLoader, DataLoader, float]:
-        resize_size = self.learner.resize_size
-        use_foreground = self.learner.use_foreground
-
-        # 1. Initialize Test Dataset
-        test_dataset = LFW2Dataset(is_train=False, resize_size=resize_size, 
-                                   use_foreground=use_foreground)
-        
-        # 2. Split Train and Val
-        train_subset, val_subset, train_pos_pct = self.split_train_val(resize_size, use_foreground)
-
-        # 3. Handle Normalization logic
-        if self.learner.normalize_imgs:
-            print("Computing per-pixel normalization stats from training set...")
-            # Access the underlying LFW2Dataset from the Subset wrapper
-            base_train_ds: LFW2Dataset = train_subset.dataset
-            # Calculate stats ONLY using the training indices
-            train_mean, train_std = base_train_ds.calc_images_mean_std(train_subset.indices)
-            
-            # Inject these stats into all datasets
-            base_train_ds.set_normalization_stats(train_mean, train_std) # affects train
-            val_subset.dataset.set_normalization_stats(train_mean, train_std) # affects val
-            test_dataset.set_normalization_stats(train_mean, train_std) # affects test
-            print("Normalization stats applied to all loaders.")
-
-        # 4. Create Loaders
-        train_loader = DataLoader(train_subset, batch_size=self.batch_size, shuffle=True, 
-                                  num_workers=self.num_workers, pin_memory=True)
-        val_loader = DataLoader(val_subset, batch_size=self.batch_size, shuffle=False, 
-                                num_workers=self.num_workers, pin_memory=True)
-        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, 
-                                 num_workers=self.num_workers, pin_memory=True)
-
-        return train_loader, val_loader, test_loader, train_pos_pct
-    
-    def split_train_val(self, resize_size: tuple[int,int], use_foreground: bool | None) -> tuple[Subset, Subset, float]:
-        """
-        Load and split the full train dataset to train and val datasets.
-        Split connected components based on val_ratio probability.
-
-        :param resize_size: The resize_size
-        :type resize_size: tuple[int, int]
-        :return: (train_dataset, test_dataset)
-        :rtype: tuple[Subset, Subset]
-        """
-        full_train_base = LFW2Dataset(is_train=True, img_transformer=self.img_transformer, 
-                                      resize_size=resize_size, use_foreground=use_foreground)
-        full_val_base = LFW2Dataset(is_train=True, img_transformer=None, resize_size=resize_size, 
-                                    use_foreground=use_foreground)
-
-        df = full_train_base.pairs_df
-        component_indices = calculate_data_connected_components(df)
-        
-        val_idx = []
-        train_idx = []
-        # Assign components based on val_ratio probability
-        np.random.seed(42)
-        for indices in component_indices:
-            if np.random.rand() < self.val_ratio:
-                val_idx.extend(indices)
-            else:
-                train_idx.extend(indices)
-
-        # Reporting Statistics
-        def print_stats(indices, name):
-            if not indices:
-                print(f"{name} Set: Empty")
-                return
-            subset_df = df.iloc[indices]
-            pos = (subset_df['name1'] == subset_df['name2']).sum()
-            neg = len(subset_df) - pos
-            pos_percent = pos/len(subset_df)
-            print(f"{name} Set: Positive={pos} ({pos_percent:.3f}%), Negative={neg}, Total={len(subset_df)}")
-            return pos_percent
-
-        train_positive_percent = print_stats(train_idx, "Train")
-        print_stats(val_idx, "Validation")
-
-        # 6. Create Subsets
-        train_dataset = Subset(full_train_base, train_idx)
-        val_dataset = Subset(full_val_base, val_idx)
-        
-        return train_dataset, val_dataset, train_positive_percent
 
     def setup_metrics(self) -> tuple[MetricCollection, MetricCollection, MetricCollection]:
         """
@@ -326,7 +244,90 @@ class Pipeline():
         except (ValueError, IndexError):
             print("Invalid selection. Please enter a valid numerical index.")
             return self.request_learner_name()  # Optional: recursive call to retry
+
+def setup_loaders(resize_size: tuple[int, int] | None, use_foreground: bool | None, batch_size: int, normalize_imgs: bool | None,
+                      num_workers: int, img_transformer: ImgTransformer, val_ratio: float) -> tuple[DataLoader, DataLoader, DataLoader, float]:
+    # 1. Initialize Test Dataset
+    test_dataset = LFW2Dataset(is_train=False, resize_size=resize_size, 
+                                use_foreground=use_foreground)
+    
+    # 2. Split Train and Val
+    train_subset, val_subset, train_pos_pct = split_train_val(resize_size, use_foreground, img_transformer, val_ratio)
+
+    # 3. Handle Normalization logic
+    if normalize_imgs:
+        print("Computing per-pixel normalization stats from training set...")
+        # Access the underlying LFW2Dataset from the Subset wrapper
+        base_train_ds: LFW2Dataset = train_subset.dataset
+        # Calculate stats ONLY using the training indices
+        train_mean, train_std = base_train_ds.calc_images_mean_std(train_subset.indices)
         
+        # Inject these stats into all datasets
+        base_train_ds.set_normalization_stats(train_mean, train_std) # affects train
+        val_subset.dataset.set_normalization_stats(train_mean, train_std) # affects val
+        test_dataset.set_normalization_stats(train_mean, train_std) # affects test
+        print("Normalization stats applied to all loaders.")
+
+    # 4. Create Loaders
+    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, 
+                                num_workers=num_workers, pin_memory=True)
+    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, 
+                            num_workers=num_workers, pin_memory=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, 
+                                num_workers=num_workers, pin_memory=True)
+
+    return train_loader, val_loader, test_loader, train_pos_pct
+
+def split_train_val(resize_size: tuple[int,int], use_foreground: bool | None, img_transformer: ImgTransformer, val_ratio: float) -> tuple[Subset, Subset, float]:
+    """
+    Load and split the full train dataset to train and val datasets.
+    Split connected components based on val_ratio probability.
+
+    :param resize_size: The resize_size
+    :type resize_size: tuple[int, int]
+    :return: (train_dataset, test_dataset)
+    :rtype: tuple[Subset, Subset]
+    """
+    full_train_base = LFW2Dataset(is_train=True, img_transformer=img_transformer, 
+                                    resize_size=resize_size, use_foreground=use_foreground)
+    full_val_base = LFW2Dataset(is_train=True, img_transformer=None, resize_size=resize_size, 
+                                use_foreground=use_foreground)
+
+    df = full_train_base.pairs_df
+    component_indices = calculate_data_connected_components(df)
+    
+    val_idx = []
+    train_idx = []
+    # Assign components based on val_ratio probability
+    np.random.seed(42)
+    for indices in component_indices:
+        if np.random.rand() < val_ratio:
+            val_idx.extend(indices)
+        else:
+            train_idx.extend(indices)
+
+    # Reporting Statistics
+    def print_stats(indices, name):
+        if not indices:
+            print(f"{name} Set: Empty")
+            return
+        subset_df = df.iloc[indices]
+        pos = (subset_df['name1'] == subset_df['name2']).sum()
+        neg = len(subset_df) - pos
+        pos_percent = pos/len(subset_df)
+        print(f"{name} Set: Positive={pos} ({pos_percent:.3f}%), Negative={neg}, Total={len(subset_df)}")
+        return pos_percent
+
+    train_positive_percent = print_stats(train_idx, "Train")
+    print_stats(val_idx, "Validation")
+
+    # 6. Create Subsets
+    train_dataset = Subset(full_train_base, train_idx)
+    val_dataset = Subset(full_val_base, val_idx)
+    
+    return train_dataset, val_dataset, train_positive_percent
+
+
 def find_device() -> torch.device:
     """
     Find apropriate computation hardware

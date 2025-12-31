@@ -4,3 +4,4 @@ data
 __pycache__/
 eda_plots
 data.zip
+model_weights.pth

@@ -49,5 +49,5 @@ class Learner(ABC):
         pass
 
     def load_model(self, model_path: str):
-        state_dict = torch.load(model_path, weights_only=True)
+        state_dict = torch.load(model_path, weights_only=True, map_location=self.device)
         self.model.load_state_dict(state_dict)
